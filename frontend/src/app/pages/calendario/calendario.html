@@ -1,0 +1,275 @@
+<div class="max-w-7xl mx-auto px-6 lg:px-10 py-10">
+    <header class="card-pop p-6 md:p-7 overflow-hidden relative mb-6">
+        <div
+            class="absolute inset-y-0 right-0 w-1/3 bg-[radial-gradient(circle_at_top_right,rgba(214,158,46,0.16),transparent_65%)] pointer-events-none">
+        </div>
+        <div class="relative">
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                <span class="badge badge-gold">🏟️ Calendario</span>
+                <span class="badge badge-info">📊 Classifica</span>
+            </div>
+            <h1 class="page-title">Calendario e classifica</h1>
+            <p class="page-subtitle">Sezione pubblica della lega: consultazione libera, nessuna modifica consentita.</p>
+        </div>
+    </header>
+
+    @if (loading()) {
+    <div class="card p-10 flex flex-col items-center gap-3">
+        <div class="w-6 h-6 rounded-full border-2 border-pitch border-t-transparent animate-spin"></div>
+        <p class="text-sm text-text-secondary">Caricamento calendario e classifica...</p>
+    </div>
+    } @else if (error()) {
+    <div class="card p-6 border-danger/30 bg-danger-soft">
+        <p class="text-sm text-danger">{{ error() }}</p>
+    </div>
+    } @else {
+    <section class="grid gap-4 md:grid-cols-3 mb-6">
+        <div class="card p-5">
+            <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary mb-2">Capolista</p>
+            @if (leader(); as leaderRow) {
+            <ng-container>
+                <p class="font-display text-2xl font-bold text-text">{{ leaderRow.team }}</p>
+                <p class="text-sm text-text-secondary mt-1">{{ leaderRow.points }} pt · {{ leaderRow.goal_diff }} diff
+                    reti</p>
+            </ng-container>
+            } @else {
+            <ng-container>
+                <p class="font-display text-2xl font-bold text-text">—</p>
+                <p class="text-sm text-text-secondary mt-1">0 pt · 0 diff reti</p>
+            </ng-container>
+            }
+        </div>
+        <div class="card p-5">
+            <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary mb-2">Squadre</p>
+            <p class="font-display text-2xl font-bold text-text">{{ standings().length }}</p>
+            <p class="text-sm text-text-secondary mt-1">Classifica completa della lega</p>
+        </div>
+        <div class="card p-5">
+            <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary mb-2">Ultima giornata</p>
+            @if (latestRound(); as latest) {
+            <ng-container>
+                <p class="font-display text-2xl font-bold text-text">{{ latest.league_round }}</p>
+                <p class="text-sm text-text-secondary mt-1">Serie A {{ latest.serie_a_round ?? '—' }}</p>
+            </ng-container>
+            } @else {
+            <ng-container>
+                <p class="font-display text-2xl font-bold text-text">—</p>
+                <p class="text-sm text-text-secondary mt-1">Serie A —</p>
+            </ng-container>
+            }
+        </div>
+    </section>
+
+    <section class="space-y-6">
+        <div class="space-y-6">
+            <div class="card overflow-hidden">
+                <header class="px-6 py-4 border-b border-border flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="section-title">Classifica</h2>
+                        <p class="text-sm text-text-secondary mt-1">Aggiornata dai file ufficiali della lega.</p>
+                    </div>
+                    @if (data()?.source_url) {
+                    <a class="btn btn-ghost" [href]="data()?.source_url" target="_blank" rel="noreferrer">Fonte</a>
+                    }
+                </header>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-surface-inset/70 text-text-secondary uppercase text-[11px] tracking-[0.18em]">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Pos</th>
+                                <th class="px-4 py-3 text-left">Squadra</th>
+                                <th class="px-3 py-3 text-center">Pt</th>
+                                <th class="px-3 py-3 text-center">G</th>
+                                <th class="px-3 py-3 text-center">V</th>
+                                <th class="px-3 py-3 text-center">N</th>
+                                <th class="px-3 py-3 text-center">P</th>
+                                <th class="px-3 py-3 text-center">GF</th>
+                                <th class="px-3 py-3 text-center">GS</th>
+                                <th class="px-3 py-3 text-center">DR</th>
+                                <th class="px-4 py-3 text-right">Pt. totali</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (row of standings(); track row.team) {
+                            <tr class="border-t border-border hover:bg-surface-inset/40 transition-colors">
+                                <td class="px-4 py-3 font-display font-semibold text-text">{{ row.position }}</td>
+                                <td class="px-4 py-3 min-w-52">
+                                    <div class="flex items-center gap-3">
+                                        <span
+                                            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                                            [class.podium-1]="row.position === 1" [class.podium-2]="row.position === 2"
+                                            [class.podium-3]="row.position === 3"
+                                            [class.podium-other]="row.position > 3">
+                                            {{ row.position }}
+                                        </span>
+                                        <span class="font-medium text-text">{{ row.team }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3 text-center font-semibold text-text">{{ row.points }}</td>
+                                <td class="px-3 py-3 text-center">{{ row.played }}</td>
+                                <td class="px-3 py-3 text-center">{{ row.wins }}</td>
+                                <td class="px-3 py-3 text-center">{{ row.draws }}</td>
+                                <td class="px-3 py-3 text-center">{{ row.losses }}</td>
+                                <td class="px-3 py-3 text-center">{{ row.goals_for }}</td>
+                                <td class="px-3 py-3 text-center">{{ row.goals_against }}</td>
+                                <td class="px-3 py-3 text-center" [class.text-success]="row.goal_diff > 0"
+                                    [class.text-danger]="row.goal_diff < 0">
+                                    {{ row.goal_diff > 0 ? '+' : '' }}{{ row.goal_diff }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-medium text-text-secondary">{{ row.total_points |
+                                    number:'1.0-1' }}</td>
+                            </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-3">
+                @for (row of topThree(); track row.team) {
+                <div class="card p-5">
+                    <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary mb-2">{{ row.position }} posto</p>
+                    <p class="font-display text-lg font-bold text-text">{{ row.team }}</p>
+                    <p class="text-sm text-text-secondary mt-1">{{ row.points }} pt · {{ row.wins }} vittorie</p>
+                </div>
+                }
+            </div>
+        </div>
+
+        <div class="card p-5 md:p-6 overflow-hidden relative">
+            <div
+                class="absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(29,122,73,0.14),transparent_68%)] pointer-events-none">
+            </div>
+            <div class="relative space-y-5">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                        <h2 class="section-title">Calendario della lega</h2>
+                        <p class="text-sm text-text-secondary mt-1">La classifica resta sopra, qui sotto scorri e
+                            confronti ogni giornata.</p>
+                    </div>
+                    <span class="badge badge-info">{{ rounds().length }} giornate</span>
+                </div>
+
+                <div class="rounded-3xl border border-border bg-surface-inset/55 p-3 md:p-4 space-y-4">
+                    <div class="flex items-center justify-between gap-3 flex-wrap">
+                        <p class="text-xs uppercase tracking-[0.22em] text-text-tertiary">Scelta giornata</p>
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="btn btn-ghost" [disabled]="!canSelectPrevious()"
+                                (click)="selectPreviousRound()">
+                                ← Precedente
+                            </button>
+                            <button type="button" class="btn btn-ghost" [disabled]="!canSelectNext()"
+                                (click)="selectNextRound()">
+                                Successiva →
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 gap-2">
+                        @for (round of rounds(); track round.league_round) {
+                        <button type="button" class="rounded-2xl border px-3 py-3 text-center transition-all"
+                            [class.bg-pitch]="isSelectedRound(round.league_round)"
+                            [class.border-pitch]="isSelectedRound(round.league_round)"
+                            [class.text-white]="isSelectedRound(round.league_round)"
+                            [class.shadow-soft]="isSelectedRound(round.league_round)"
+                            [class.bg-surface]="!isSelectedRound(round.league_round)"
+                            [class.border-border]="!isSelectedRound(round.league_round)"
+                            (click)="selectRound(round.league_round)">
+                            <p class="font-display text-lg font-bold leading-none">{{ round.league_round }}</p>
+                            <p class="text-xs mt-1" [class.text-white/80]="isSelectedRound(round.league_round)"
+                                [class.text-text-tertiary]="!isSelectedRound(round.league_round)">
+                                A {{ round.serie_a_round ?? '—' }}
+                            </p>
+                        </button>
+                        }
+                    </div>
+                </div>
+
+                @if (selectedRound(); as round) {
+                <section class="space-y-4">
+                    <header class="flex items-end justify-between gap-3 flex-wrap">
+                        <div>
+                            <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary mb-2">Focus giornata</p>
+                            <h3 class="font-display text-3xl font-bold text-text">{{ round.league_round }}ª giornata
+                            </h3>
+                            <p class="text-sm text-text-secondary mt-1">Serie A {{ round.serie_a_round ?? '—' }} · {{
+                                round.matches.length }} partite</p>
+                        </div>
+                        <div class="rounded-2xl border border-border bg-surface px-4 py-3 min-w-40">
+                            <p class="text-xs uppercase tracking-[0.22em] text-text-tertiary mb-1">Sezione pubblica</p>
+                            <p class="text-sm text-text-secondary">Solo consultazione, nessuna modifica.</p>
+                        </div>
+                    </header>
+
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        @for (match of round.matches; track $index) {
+                        <article
+                            class="rounded-3xl border border-border bg-white/70 p-4 md:p-5 shadow-soft-sm backdrop-blur-sm">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <span class="badge badge-neutral">Match {{ $index + 1 }}</span>
+                                <span class="text-xs text-text-tertiary">{{ resultLabel(match.result) }}</span>
+                            </div>
+
+                            <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-4 items-center">
+                                <div class="min-w-0 text-right">
+                                    <p class="text-xs uppercase tracking-[0.18em] text-text-tertiary mb-2">Casa</p>
+                                    <p class="font-display text-xl font-bold truncate"
+                                        [class.text-success]="hasHomeWon(match.result)"
+                                        [class.text-text]="!hasHomeWon(match.result)">
+                                        {{ match.home_team }}
+                                    </p>
+                                    <p class="text-sm text-text-secondary mt-1">{{ match.home_score ?? '—' }} punti</p>
+                                </div>
+
+                                <div class="flex flex-col items-center gap-2 px-2">
+                                    <div class="rounded-[1.75rem] border px-3 py-3 min-w-28"
+                                        [class.bg-success-soft]="hasHomeWon(match.result) || hasAwayWon(match.result)"
+                                        [class.border-success/20]="hasHomeWon(match.result) || hasAwayWon(match.result)"
+                                        [class.bg-surface-inset]="isDraw(match.result) || !match.result"
+                                        [class.border-border]="isDraw(match.result) || !match.result">
+                                        <div
+                                            class="flex items-center justify-center gap-2 font-display font-extrabold text-2xl text-text leading-none">
+                                            <span>{{ homeGoals(match.result) ?? '—' }}</span>
+                                            <span class="text-text-tertiary text-sm">:</span>
+                                            <span>{{ awayGoals(match.result) ?? '—' }}</span>
+                                        </div>
+                                        <p
+                                            class="text-[10px] uppercase tracking-[0.22em] text-center text-text-tertiary mt-2">
+                                            Risultato</p>
+                                    </div>
+                                    <span class="text-[11px] uppercase tracking-[0.2em] text-text-tertiary">vs</span>
+                                </div>
+
+                                <div class="min-w-0">
+                                    <p class="text-xs uppercase tracking-[0.18em] text-text-tertiary mb-2">Trasferta</p>
+                                    <p class="font-display text-xl font-bold truncate"
+                                        [class.text-success]="hasAwayWon(match.result)"
+                                        [class.text-text]="!hasAwayWon(match.result)">
+                                        {{ match.away_team }}
+                                    </p>
+                                    <p class="text-sm text-text-secondary mt-1">{{ match.away_score ?? '—' }} punti</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 grid grid-cols-2 gap-3 text-xs">
+                                <div class="rounded-2xl bg-surface-inset/70 px-3 py-2 text-right">
+                                    <p class="uppercase tracking-[0.18em] text-text-tertiary mb-1">Fantapunti casa</p>
+                                    <p class="font-semibold text-text">{{ match.home_score ?? '—' }}</p>
+                                </div>
+                                <div class="rounded-2xl bg-surface-inset/70 px-3 py-2">
+                                    <p class="uppercase tracking-[0.18em] text-text-tertiary mb-1">Fantapunti trasferta
+                                    </p>
+                                    <p class="font-semibold text-text">{{ match.away_score ?? '—' }}</p>
+                                </div>
+                            </div>
+                        </article>
+                        }
+                    </div>
+                </section>
+                }
+            </div>
+        </div>
+    </section>
+    }
+</div>

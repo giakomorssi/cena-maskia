@@ -1,0 +1,76 @@
+<div class="max-w-3xl mx-auto px-6 lg:px-10 py-10">
+    <header class="page-header">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-info">📊 Voti</span>
+        </div>
+        <h1 class="page-title">Sondaggi</h1>
+        <p class="page-subtitle">Vota e vedi i risultati. Un voto per dispositivo.</p>
+    </header>
+
+    @if (voteError()) {
+    <div class="card p-4 mb-4 border-danger/30 bg-danger-soft">
+        <p class="text-sm text-danger">{{ voteError() }}</p>
+    </div>
+    }
+
+    @if (polls().length === 0) {
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6">
+                <path d="M5 12v8M12 8v12M19 4v16" stroke-linecap="round" />
+            </svg>
+        </div>
+        <p class="font-semibold text-text mb-1">Nessun sondaggio</p>
+        <p class="text-sm">Torna più tardi.</p>
+    </div>
+    } @else {
+    <div class="space-y-5">
+        @for (p of polls(); track p.id) {
+        <section class="card card-hover p-6 md:p-7 animate-fade">
+            <div class="flex items-start justify-between mb-4 gap-4">
+                <h2 class="font-display text-lg font-bold text-text">{{ p.question }}</h2>
+                @if (p.is_open) {
+                <span class="badge badge-success">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+                    Aperto
+                </span>
+                } @else {
+                <span class="badge badge-neutral">Chiuso</span>
+                }
+            </div>
+            <div class="space-y-2.5">
+                @for (o of p.options; track o.id) {
+                <div>
+                    @if (hasVoted(p) || !p.is_open) {
+                    <div class="relative bg-surface-inset rounded-lg overflow-hidden h-11 border border-border-muted">
+                        <div class="absolute inset-y-0 left-0 animate-bar bg-pitch-soft"
+                            [style.width.%]="pct(p, o.votes_count)"></div>
+                        <div class="relative flex justify-between items-center px-4 h-full text-sm">
+                            <span class="font-medium">{{ o.label }}</span>
+                            <span class="text-xs text-text-secondary tabular-nums font-semibold">
+                                {{ o.votes_count }} · {{ pct(p, o.votes_count) }}%
+                            </span>
+                        </div>
+                    </div>
+                    } @else {
+                    <button (click)="vote(p, o.id)"
+                        class="w-full text-left px-4 py-2.5 rounded-lg border border-border bg-surface-raised hover:border-pitch hover:bg-accent-soft text-sm font-medium transition-all">
+                        {{ o.label }}
+                    </button>
+                    }
+                </div>
+                }
+            </div>
+            <p class="text-xs text-text-tertiary mt-4 flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-3.5 h-3.5">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                {{ totalVotes(p) }} voti totali
+                @if (hasVoted(p)) { · <span class="text-pitch font-medium">hai votato</span> }
+            </p>
+        </section>
+        }
+    </div>
+    }
+</div>

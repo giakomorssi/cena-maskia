@@ -1,0 +1,340 @@
+<div class="max-w-6xl mx-auto px-6 lg:px-10 py-10">
+
+    <!-- Header -->
+    <header class="page-header">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-gold">Squadra</span>
+            @if (session.isLoggedIn()) {
+            <span class="badge badge-success">Sessione attiva</span>
+            }
+        </div>
+        <h1 class="page-title">Profilo squadra</h1>
+        <p class="page-subtitle">Accesso dedicato per aggiornare il profilo, caricare il bilancio e controllare lo stato
+            della tua squadra.</p>
+    </header>
+
+    <!-- Login -->
+    @if (!session.isLoggedIn()) {
+    <div class="animate-fade space-y-6">
+        <div class="card p-8 max-w-3xl mx-auto">
+            <div class="text-center mb-8">
+                <div
+                    class="w-14 h-14 rounded-2xl bg-brand-grad flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
+                    &#9917;
+                </div>
+                <h2 class="font-display text-2xl font-bold">Seleziona la tua squadra</h2>
+                <p class="text-sm text-text-secondary mt-1">Clicca sulla card per accedere al profilo.</p>
+            </div>
+        </div>
+
+        @if (loginError()) {
+        <div class="alert alert-error mb-6">{{ loginError() }}</div>
+        }
+
+        <div class="grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+            @for (team of teams(); track team.id) {
+            <button type="button"
+                class="group relative rounded-2xl border border-border bg-surface-inset p-4 text-left transition-all hover:border-brand hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                [disabled]="loginLoading()" (click)="loginAs(team)">
+                <div
+                    class="w-10 h-10 rounded-xl bg-brand-grad flex items-center justify-center text-white font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
+                    {{ team.name.charAt(0).toUpperCase() }}
+                </div>
+                <p class="font-semibold text-sm leading-tight">{{ team.name }}</p>
+                @if (team.manager_name) {
+                <p class="text-xs text-text-tertiary mt-0.5 truncate">{{ team.manager_name }}</p>
+                }
+            </button>
+            }
+        </div>
+
+        @if (loginLoading()) {
+        <div class="flex items-center justify-center gap-2 mt-6 text-sm text-text-secondary">
+            <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Accesso in corso&#8230;
+        </div>
+        }
+    </div>
+
+    } @else {
+    <div class="animate-fade space-y-6">
+
+        @if (message()) {
+        <div class="alert alert-success">{{ message() }}</div>
+        }
+
+        @if (dashboard(); as d) {
+
+        <!-- Hero squadra -->
+        <div class="card overflow-hidden">
+            <div class="h-2 bg-brand-grad"></div>
+            <div class="p-6 md:p-8 flex flex-wrap items-start justify-between gap-6">
+                <div class="flex items-center gap-5">
+                    <div
+                        class="w-16 h-16 rounded-2xl bg-brand-grad flex items-center justify-center text-white font-bold text-3xl shrink-0">
+                        {{ d.team.name.charAt(0).toUpperCase() }}
+                    </div>
+                    <div>
+                        <h2 class="font-display text-2xl font-bold">{{ d.team.name }}</h2>
+                        @if (d.team.manager_name) {
+                        <p class="text-sm text-text-secondary mt-0.5">{{ d.team.manager_name }}</p>
+                        }
+                        @if (d.team.home_city) {
+                        <p class="text-xs text-text-tertiary mt-0.5">{{ d.team.home_city }}</p>
+                        }
+                    </div>
+                </div>
+                <button class="btn btn-ghost btn-sm" (click)="logout()">
+                    <svg class="w-4 h-4 mr-1.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Esci
+                </button>
+            </div>
+
+            <!-- Stat strip -->
+            <div
+                class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border border-t border-border">
+                <div class="px-6 py-4">
+                    <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">Stagione corrente</p>
+                    <p class="font-display text-xl font-bold">{{ d.current_season?.name ?? '&#8212;' }}</p>
+                </div>
+                <div class="px-6 py-4">
+                    <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">Bilancio stagione</p>
+                    @if (d.has_uploaded_current_balance) {
+                    <span class="badge badge-success">&#10003; Consegnato</span>
+                    } @else {
+                    <span class="badge badge-warning">In attesa</span>
+                    }
+                </div>
+                <div class="px-6 py-4">
+                    <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">Multe aperte</p>
+                    @if (d.unpaid_fines_total > 0) {
+                    <p class="font-display text-xl font-bold text-danger">{{ d.unpaid_fines_total | number:'1.0-2' }}
+                    </p>
+                    } @else {
+                    <span class="badge badge-success">&#10003; Nessuna</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Main grid -->
+        <div class="grid xl:grid-cols-[1.4fr_1fr] gap-6 items-start">
+
+            <!-- Left column -->
+            <div class="space-y-6">
+
+                <!-- Profilo -->
+                <div class="card p-6">
+                    <h3 class="font-display text-lg font-bold mb-5">Modifica profilo</h3>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="input-label">Manager</label>
+                            <input class="input" title="Manager" placeholder="Nome manager"
+                                [value]="profileForm().manager_name"
+                                (input)="setField('manager_name', $any($event.target).value)" />
+                        </div>
+                        <div>
+                            <label class="input-label">Citt&#224;</label>
+                            <input class="input" title="Citta" placeholder="Citt&#224; di riferimento"
+                                [value]="profileForm().home_city"
+                                (input)="setField('home_city', $any($event.target).value)" />
+                        </div>
+                        <div>
+                            <label class="input-label">Anno fondazione</label>
+                            <input class="input" type="number" title="Anno fondazione" placeholder="Es. 2018"
+                                [value]="profileForm().founded_year"
+                                (input)="setField('founded_year', $any($event.target).value)" />
+                        </div>
+                        <div>
+                            <label class="input-label">Logo URL</label>
+                            <input class="input" title="Logo URL" placeholder="https://..."
+                                [value]="profileForm().logo_url"
+                                (input)="setField('logo_url', $any($event.target).value)" />
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="input-label">Bio profilo</label>
+                            <textarea rows="3" class="textarea" title="Bio profilo"
+                                placeholder="Racconta la squadra, stile di gioco, obiettivi&#8230;"
+                                [value]="profileForm().profile_bio"
+                                (input)="setField('profile_bio', $any($event.target).value)"></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-3">
+                        <button class="btn btn-primary" [disabled]="saving()" (click)="saveProfile()">
+                            {{ saving() ? 'Salvataggio&#8230;' : 'Salva profilo' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick links -->
+                <div class="card p-6">
+                    <h3 class="font-display text-lg font-bold mb-1">Sezioni operative</h3>
+                    <p class="text-sm text-text-secondary mb-4">Bilancio, mercato e rosa hanno pagine dedicate.</p>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <a routerLink="/rose"
+                            class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
+                            <div
+                                class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-sm font-bold text-emerald-700 shrink-0">R</div>
+                            <div>
+                                <p class="font-semibold text-sm">Rosa</p>
+                                <p class="text-xs text-text-tertiary">Stipendi, valori, contratti</p>
+                            </div>
+                        </a>
+                        <a routerLink="/economia-squadra"
+                            class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
+                            <div
+                                class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-sm font-bold text-amber-700 shrink-0">E</div>
+                            <div>
+                                <p class="font-semibold text-sm">Economia squadra</p>
+                                <p class="text-xs text-text-tertiary">Stadio, sponsor, premi</p>
+                            </div>
+                        </a>
+                        <a routerLink="/bilanci"
+                            class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
+                            <div
+                                class="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">B</div>
+                            <div>
+                                <p class="font-semibold text-sm">Bilancio</p>
+                                <p class="text-xs text-text-tertiary">Compila online o upload</p>
+                            </div>
+                        </a>
+                        <a routerLink="/mercato"
+                            class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
+                            <div
+                                class="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-sm font-bold text-purple-700 shrink-0">M</div>
+                            <div>
+                                <p class="font-semibold text-sm">Mercato</p>
+                                <p class="text-xs text-text-tertiary">Proposte e ratifica</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right column -->
+            <aside class="space-y-6">
+
+                <!-- Ultimo bilancio -->
+                <div class="card p-6">
+                    <h3 class="font-display text-lg font-bold mb-4">Ultimo bilancio</h3>
+                    @if (d.latest_balance) {
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="text-text-secondary">Inviato</span>
+                            <span class="font-medium tabular-nums">{{ d.latest_balance.submitted_at |
+                                date:'dd/MM/yyyy HH:mm' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="text-text-secondary">Utile netto</span>
+                            <span class="font-bold text-base" [class.text-success]="d.latest_balance.utile >= 0"
+                                [class.text-danger]="d.latest_balance.utile < 0">
+                                {{ d.latest_balance.utile | number:'1.2-2' }}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="text-text-secondary">Sanzione</span>
+                            <span [class]="sanctionClass(d.latest_balance.sanction_level)">{{
+                                sanctionLabel(d.latest_balance.sanction_level) }}</span>
+                        </div>
+                    </div>
+                    } @else {
+                    <div class="empty-state p-0! border-0! bg-transparent!">
+                        <p class="font-semibold">Nessun invio</p>
+                        <p class="text-sm">Non hai ancora caricato un bilancio.</p>
+                    </div>
+                    }
+                </div>
+
+                <!-- Storico bilanci -->
+                @if (d.recent_balances.length > 0) {
+                <div class="card p-6">
+                    <h3 class="font-display text-lg font-bold mb-4">Storico bilanci</h3>
+                    <div class="space-y-2">
+                        @for (b of d.recent_balances; track b.id) {
+                        <div
+                            class="flex items-center justify-between rounded-xl border border-border bg-surface-inset px-4 py-3 text-sm">
+                            <div>
+                                <p class="font-medium tabular-nums">{{ b.submitted_at | date:'dd/MM/yyyy' }}</p>
+                                <p class="text-xs text-text-tertiary">Utile {{ b.utile | number:'1.2-2' }}</p>
+                            </div>
+                            <span [class]="sanctionClass(b.sanction_level)">{{ sanctionLabel(b.sanction_level)
+                                }}</span>
+                        </div>
+                        }
+                    </div>
+                </div>
+                }
+
+                <!-- Multe -->
+                <div class="card p-6">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <h3 class="font-display text-lg font-bold">Multe</h3>
+                        @if (d.unpaid_fines_total > 0) {
+                        <span class="badge badge-danger">{{ d.unpaid_fines_total | number:'1.0-2' }} da pagare</span>
+                        }
+                    </div>
+                    @if (d.fines.length === 0) {
+                    <p class="text-sm text-text-tertiary">&#10003; Nessuna multa registrata.</p>
+                    } @else {
+                    <div class="divide-y divide-border">
+                        @for (f of d.fines; track f.id) {
+                        <div class="flex items-center justify-between py-3 text-sm gap-2">
+                            <div class="min-w-0">
+                                <p class="font-medium truncate">{{ f.reason }}</p>
+                                <p class="text-xs text-text-tertiary">{{ f.fine_date | date:'dd/MM/yyyy' }}</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="font-semibold tabular-nums" [class.text-danger]="!f.paid">{{ f.amount |
+                                    number:'1.0-2' }}</p>
+                                @if (f.paid) { <span class="badge badge-success">Pagata</span> }
+                                @else { <span class="badge badge-warning">Da pagare</span> }
+                            </div>
+                        </div>
+                        }
+                    </div>
+                    }
+                </div>
+
+                <!-- Palmares -->
+                @if (orderedHonors().length > 0) {
+                <div class="card p-6">
+                    <h3 class="font-display text-lg font-bold mb-4">Palmares</h3>
+                    <div class="space-y-2">
+                        @for (h of orderedHonors(); track h.id) {
+                        <div
+                            class="flex items-center gap-3 rounded-xl border border-border bg-surface-inset px-4 py-3">
+                            <span class="text-xl shrink-0">
+                                @switch (h.position) {
+                                @case (1) { &#129351; }
+                                @case (2) { &#129352; }
+                                @case (3) { &#129353; }
+                                @default { n }
+                                }
+                            </span>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-sm truncate">{{ h.trophy }}</p>
+                                @if (h.notes) {
+                                <p class="text-xs text-text-tertiary">{{ h.notes }}</p>
+                                }
+                            </div>
+                        </div>
+                        }
+                    </div>
+                </div>
+                }
+
+            </aside>
+
+        </div>
+        }
+    </div>
+    }
+</div>

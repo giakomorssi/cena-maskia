@@ -1,0 +1,683 @@
+<div class="max-w-6xl mx-auto px-6 lg:px-10 py-10">
+    <header class="page-header">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-info">📊 Bilanci</span>
+        </div>
+        <h1 class="page-title">Bilanci di squadra</h1>
+        @if (isTeamView()) {
+        <p class="page-subtitle">Qui puoi compilare online e consultare solo i bilanci della tua squadra.</p>
+        } @else if (isAdminView()) {
+        <p class="page-subtitle">Vista di gestione per consultare tutti i bilanci e aprirli in modifica completa.
+        </p>
+        } @else {
+        <p class="page-subtitle">L'accesso ai bilanci e riservato a squadre e admin autenticati.</p>
+        }
+    </header>
+
+    <!-- Tabs -->
+    <div class="flex flex-wrap gap-2 mb-6">
+        <button (click)="setTab('guida')" class="chip" [class.chip-active]="tab()==='guida'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
+                <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z" stroke-linejoin="round" />
+            </svg>
+            Guida alla compilazione
+        </button>
+        <button (click)="setTab('lista')" class="chip" [class.chip-active]="tab()==='lista'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
+                <path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round" />
+            </svg>
+            Bilanci pubblicati
+        </button>
+        @if (canUploadAsTeam() || isAdminView()) {
+        <button (click)="setTab('compila')" class="chip" [class.chip-active]="tab()==='compila'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
+                <path d="M11 4h10M11 8h10M11 12h10M11 16h7M3 4l2 2 4-4M3 12l2 2 4-4" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>
+            Compila online
+        </button>
+        }
+    </div>
+
+    <!-- GUIDA -->
+    @if (tab()==='guida') {
+    <div class="space-y-6 animate-fade">
+        <div class="card p-5 border-warning/30 bg-warning-soft">
+            <div class="flex items-start gap-3">
+                <div class="mt-0.5 rounded-xl bg-white/70 p-2 text-warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-5 h-5">
+                        <path
+                            d="M12 8v5m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="font-semibold text-warning">Compilazione solo online</p>
+                    <p class="text-sm text-warning/90 mt-1">Il bilancio va compilato in piattaforma entro il <strong>{{
+                            submissionDeadlineLabel }}</strong>. Non sono piu previsti upload manuali o template Excel.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <article class="card p-8 md-content" [innerHTML]="guida() | markdown"></article>
+    </div>
+    }
+
+    <!-- LISTA -->
+    @if (tab()==='lista') {
+    <div class="space-y-6 animate-fade">
+        @if (authRequired()) {
+        <div class="card p-6 border-warning/30 bg-warning-soft flex items-start gap-4">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                class="w-6 h-6 text-warning shrink-0 mt-0.5">
+                <path
+                    d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div>
+                <p class="font-semibold text-warning">Accesso richiesto</p>
+                <p class="text-sm text-warning/80 mt-1">
+                    Entra dal tuo <a routerLink="/profilo-squadra" class="underline font-semibold">profilo squadra</a>
+                    oppure come <a routerLink="/admin" class="underline font-semibold">admin</a> per vedere i bilanci.
+                </p>
+            </div>
+        </div>
+        } @else {
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="flex flex-wrap gap-2 items-center">
+                <span class="text-xs font-semibold text-text-secondary uppercase tracking-wider mr-1">Stagione:</span>
+                @if (!isTeamView()) {
+                <button (click)="onSeasonChange('')" class="chip" [class.chip-active]="!selectedSeason()">Tutte</button>
+                }
+                @for (s of seasons(); track s.id) {
+                <button (click)="onSeasonChange(s.id)" class="chip" [class.chip-active]="selectedSeason()===s.id">{{
+                    s.name }}</button>
+                }
+            </div>
+            @if (isAdminView()) {
+            <p class="text-sm text-text-secondary">Usa Apri e modifica per caricare il bilancio nella tab Compila online
+                senza uscire da questa pagina.</p>
+            }
+        </div>
+
+        @if (balances().length === 0) {
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6">
+                    <path d="M3 3v18h18M7 14l3-3 3 3 5-5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+            <p class="font-semibold text-text mb-1">Nessun bilancio</p>
+            <p class="text-sm">Non sono stati pubblicati bilanci per questa stagione.</p>
+        </div>
+        } @else {
+        <div class="card overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-surface-inset text-text-secondary text-xs uppercase tracking-wider">
+                        <tr>
+                            @if (!isTeamView()) {
+                            <th class="text-left px-5 py-3">Squadra</th>
+                            }
+                            <th class="text-left px-5 py-3">Stagione</th>
+                            <th class="text-right px-5 py-3">Ricavi</th>
+                            <th class="text-right px-5 py-3">Costi</th>
+                            <th class="text-right px-5 py-3">Ammort.</th>
+                            <th class="text-right px-5 py-3">+/− val.</th>
+                            <th class="text-right px-5 py-3">Utile</th>
+                            <th class="text-left px-5 py-3">Stato</th>
+                            <th class="text-left px-5 py-3">Sanzione</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        @for (b of balances(); track b.id) {
+                        <tr class="hover:bg-surface-inset/60 transition-colors">
+                            @if (!isTeamView()) {
+                            <td class="px-5 py-3">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="avatar avatar-sm">{{ teamName(b.team_id).charAt(0) }}</div>
+                                    <span class="font-medium">{{ teamName(b.team_id) }}</span>
+                                </div>
+                            </td>
+                            }
+                            <td class="px-5 py-3 text-text-secondary">{{ seasonName(b.season_id) }}</td>
+                            <td class="px-5 py-3 text-right tabular-nums">{{ b.total_ricavi | number:'1.2-2' }}</td>
+                            <td class="px-5 py-3 text-right tabular-nums">{{ b.total_costi | number:'1.2-2' }}</td>
+                            <td class="px-5 py-3 text-right tabular-nums">{{ b.total_ammortamenti | number:'1.2-2' }}
+                            </td>
+                            <td class="px-5 py-3 text-right tabular-nums">{{ b.total_plus_minus | number:'1.2-2' }}</td>
+                            <td class="px-5 py-3 text-right font-semibold tabular-nums"
+                                [class.text-success]="b.utile>=0" [class.text-danger]="b.utile<0">
+                                {{ b.utile | number:'1.2-2' }}
+                            </td>
+                            <td class="px-5 py-3">
+                                <span [class]="balanceStatusBadgeClass(b.status)">{{ balanceStatusLabel(b.status)
+                                    }}</span>
+                            </td>
+                            <td class="px-5 py-3">
+                                <span [class]="sanctionClass(b.sanction_level)">{{ sanctionLabel(b.sanction_level) }} ·
+                                    {{ b.sanction_points }} pt</span>
+                            </td>
+                            <td class="px-5 py-3 text-right">
+                                <div class="flex items-center justify-end gap-3">
+                                    @if (isAdminView()) {
+                                    <button (click)="openAdminBalanceEditor(b.id)"
+                                        class="text-xs font-semibold text-pitch hover:underline">Apri e
+                                        modifica</button>
+                                    }
+                                    <button (click)="view(b)"
+                                        class="text-xs font-medium text-pitch hover:underline">Dettaglio →</button>
+                                </div>
+                            </td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        }
+
+        @if (selected(); as s) {
+        <div class="card-pop p-6 md:p-8 animate-fade">
+            <div class="flex items-start justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    @if (!isTeamView()) {
+                    <div class="avatar avatar-lg">{{ teamName(s.team_id).charAt(0) }}</div>
+                    }
+                    <div>
+                        <h2 class="font-display text-xl font-bold text-text">{{ isTeamView() ? 'Il tuo bilancio' :
+                            teamName(s.team_id) }}</h2>
+                        <div class="flex flex-wrap items-center gap-2 mt-1">
+                            <span [class]="balanceStatusBadgeClass(s.status)">{{ balanceStatusLabel(s.status) }}</span>
+                            <p class="text-sm text-text-secondary">Stagione {{ seasonName(s.season_id) }} · aggiornato
+                                il {{
+                                s.submitted_at | date:'dd/MM/yyyy HH:mm' }}</p>
+                        </div>
+                    </div>
+                </div>
+                <button (click)="selected.set(null)" class="btn btn-ghost p-2" aria-label="Chiudi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                        <path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+
+            @if (isAdminView()) {
+            <div class="mb-6 flex justify-end">
+                <button class="btn btn-primary btn-sm" (click)="openAdminBalanceEditor(s.id)">Apri e modifica</button>
+            </div>
+            }
+
+            <div class="rounded-xl border p-4 mb-6" [class]="balanceStatusPanelClass(s.status)">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider font-semibold opacity-80">Stato bilancio</p>
+                        <p class="font-display text-xl font-bold mt-1">{{ balanceStatusLabel(s.status) }}</p>
+                    </div>
+                    <span [class]="balanceStatusBadgeClass(s.status)">{{ balanceStatusLabel(s.status) }}</span>
+                </div>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                <div class="stat-tile">
+                    <p class="stat-label">Ricavi</p>
+                    <p class="stat-value text-success">{{ s.total_ricavi | number:'1.0-0' }}</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Costi</p>
+                    <p class="stat-value text-danger">{{ s.total_costi | number:'1.0-0' }}</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Ammortamenti</p>
+                    <p class="stat-value">{{ s.total_ammortamenti | number:'1.0-0' }}</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Plus / Minus</p>
+                    <p class="stat-value">{{ s.total_plus_minus | number:'1.0-0' }}</p>
+                </div>
+            </div>
+
+            <div class="rounded-xl border-2 p-5 mb-6" [class]="sanctionPanelClass(s.sanction_level)">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider font-bold opacity-70">Risultato netto</p>
+                        <p class="font-display text-3xl font-extrabold mt-1">{{ s.utile | number:'1.2-2' }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs uppercase tracking-wider font-bold opacity-70">Sanzione</p>
+                        <p class="font-display text-xl font-bold mt-1">{{ sanctionLabel(s.sanction_level) }}</p>
+                        <p class="text-xs">{{ s.sanction_points }} punti</p>
+                    </div>
+                </div>
+                @if (s.sanction_notes) { <p class="text-xs mt-3 opacity-80">{{ s.sanction_notes }}</p> }
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                @for (sec of ['ricavi','costi','ammortamenti','plus_minus']; track sec) {
+                @if (sectionEntries(s, sec).length > 0) {
+                <div class="card p-5">
+                    <h3 class="section-title section-title-sm mb-3">{{ sectionLabel(sec) }}</h3>
+                    <div class="space-y-4">
+                        @for (roleGroup of publishedEntriesBySectionAndRole(s, sec); track roleGroup.role) {
+                        <div class="rounded-xl border border-border bg-surface-inset/30 overflow-hidden">
+                            @if (sec === 'costi' || sec === 'ammortamenti') {
+                            <button type="button"
+                                class="w-full px-4 py-2 bg-surface-inset/60 border-b border-border flex items-center justify-between gap-2 text-left"
+                                (click)="togglePublishedGroup(s.id, sec, roleGroup.role)">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-text-tertiary">{{ isPublishedGroupCollapsed(s.id, sec,
+                                        roleGroup.role) ? '▸' : '▾' }}</span>
+                                    <p class="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{{
+                                        roleLabel(roleGroup.role) }}</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-semibold text-text-secondary tabular-nums">{{
+                                        groupTotal(roleGroup.entries) | number:'1.2-2' }}</span>
+                                    <span class="badge badge-neutral">{{ roleGroup.entries.length }}</span>
+                                </div>
+                            </button>
+                            }
+                            @if (sec !== 'costi' && sec !== 'ammortamenti' || !isPublishedGroupCollapsed(s.id, sec,
+                            roleGroup.role)) {
+                            <table class="w-full text-sm">
+                                <tbody class="divide-y divide-border">
+                                    @for (e of roleGroup.entries; track e.id) {
+                                    <tr>
+                                        <td class="py-1.5 px-4 text-text-secondary">
+                                            @if (isPlayerEntry(e)) {
+                                            <button type="button" class="text-left text-pitch hover:underline"
+                                                (click)="openPlayerDetail(e, s.team_id)">{{ e.label }}</button>
+                                            } @else {
+                                            {{ e.label }}
+                                            }
+                                        </td>
+                                        <td class="py-1.5 px-4 text-right tabular-nums font-medium">{{ e.amount |
+                                            number:'1.2-2' }}</td>
+                                    </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            }
+                        </div>
+                        }
+                    </div>
+                </div>
+                }
+                }
+            </div>
+        </div>
+        }
+        }
+    </div>
+    }
+
+    <!-- COMPILA -->
+    @if (tab()==='compila') {
+    <div class="animate-fade space-y-5">
+        @if (!canUploadAsTeam() && !isAdminView()) {
+        <div class="alert alert-warning">Devi accedere come squadra per compilare il tuo bilancio.</div>
+        } @else {
+        @if (compileLoading()) { <div class="card p-6 text-center text-text-secondary">Caricamento bozza…</div> }
+        @if (compileError()) { <div class="alert alert-error">{{ compileError() }}</div> }
+        @if (compileMessage()) { <div class="alert alert-success">{{ compileMessage() }}</div> }
+
+        @if (compileBalance(); as b) {
+        <div class="grid lg:grid-cols-[1.2fr_0.8fr] gap-4">
+            <div class="card p-5 border-warning/30 bg-warning-soft">
+                <p class="text-xs uppercase tracking-wider font-semibold text-warning">{{ isAdminView() ? 'Editor admin'
+                    : 'Scadenza e invio' }}</p>
+                <h3 class="font-display text-xl font-bold text-warning mt-1">{{ isAdminView() ? teamName(b.team_id) :
+                    'Compila entro il ' + submissionDeadlineLabel }}</h3>
+                <p class="text-sm text-warning/90 mt-2">
+                    @if (isAdminView()) {
+                    Modifica completa del bilancio di {{ teamName(b.team_id) }} restando nella sezione Bilanci.
+                    }
+                    @else {
+                    Fino a quando il bilancio resta in <strong>bozza</strong>, puoi salvarlo senza inviarlo. Quando
+                    scegli <strong>Invia definitivo</strong>, il bilancio non è più modificabile dalla squadra.
+                    }
+                </p>
+            </div>
+            <div class="card p-5 bg-surface-inset/60">
+                <p class="text-xs uppercase tracking-wider font-semibold text-text-tertiary">{{ isAdminView() ?
+                    'Contesto' : 'Modalità disponibili' }}</p>
+                <div class="mt-3 space-y-3 text-sm text-text-secondary">
+                    <div>
+                        <p class="font-semibold text-text">{{ isAdminView() ? 'Stagione' : 'Bozza' }}</p>
+                        <p>{{ isAdminView() ? seasonName(b.season_id) : 'Salva i dati ma non li pubblica e non li invia
+                            all\'admin.' }}</p>
+                    </div>
+                    @if (isAdminView()) {
+                    <div>
+                        <p class="font-semibold text-text">Stato attuale</p>
+                        <p>{{ balanceStatusLabel(b.status) }}. Se è consegnato, prima riaprilo in bozza.</p>
+                    </div>
+                    } @else {
+                    <div>
+                        <p class="font-semibold text-text">Invio definitivo</p>
+                        <p>Pubblica il bilancio come definitivo e lo rende visibile all'admin nella lista.</p>
+                    </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="grid xl:grid-cols-[1.2fr_0.8fr] gap-4">
+            <section class="card p-5 space-y-4">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider text-text-tertiary">Bilancio guidato</p>
+                        <h3 class="section-title mt-1">Voci automatiche dalla squadra</h3>
+                        <p class="text-sm text-text-secondary mt-1">Stipendi, ammortamenti, movimenti di mercato e multe
+                            si aggiornano automaticamente dal sistema.</p>
+                    </div>
+                    <span class="badge badge-success">{{ autoEntries().length + (selectedStadiumId() ? 2 : 0) }} voci
+                        auto</span>
+                </div>
+
+                <div class="grid sm:grid-cols-3 gap-3">
+                    <div class="stat-tile">
+                        <p class="stat-label">Stipendi e rosa</p>
+                        <p class="stat-value">{{ autoEntriesBySection()['costi'].length }}</p>
+                        <p class="stat-hint">costi automatici</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-label">Ammortamenti</p>
+                        <p class="stat-value">{{ autoEntriesBySection()['ammortamenti'].length }}</p>
+                        <p class="stat-hint">calcolati da fascia</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-label">Warning</p>
+                        <p class="stat-value" [class.text-danger]="compileIssues().length > 0">{{ compileIssues().length
+                            }}</p>
+                        <p class="stat-hint">da rivedere prima dell'invio</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card p-5 space-y-3">
+                <p class="text-xs uppercase tracking-wider text-text-tertiary">Revisione</p>
+                <h3 class="section-title">Controlli automatici</h3>
+                @if (compileIssues().length === 0) {
+                <div class="rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm text-pitch-dark">
+                    Nessun warning evidente: puoi procedere con il salvataggio o l'invio definitivo.
+                </div>
+                } @else {
+                <div class="space-y-2">
+                    @for (issue of compileIssues(); track issue.code) {
+                    <div class="rounded-xl border border-border bg-surface-inset/60 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-text">{{ issue.label }}</p>
+                                <p class="text-sm text-text-secondary mt-1">{{ issue.detail }}</p>
+                            </div>
+                            <span [class]="issueClass(issue)">{{ issue.severity }}</span>
+                        </div>
+                    </div>
+                    }
+                </div>
+                }
+            </section>
+        </div>
+
+        <div class="card p-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-xs uppercase text-text-tertiary tracking-wider">Stato</p>
+                <p class="font-display text-lg font-bold"><span [class]="balanceStatusBadgeClass(b.status)">{{
+                        balanceStatusLabel(b.status) }}</span></p>
+                <p class="text-xs text-text-tertiary mt-1">Stagione {{ seasonName(b.season_id) }} · scadenza {{
+                    submissionDeadlineLabel }}</p>
+            </div>
+            <div class="rounded-xl border px-4 py-3 min-w-52" [class]="balanceStatusPanelClass(b.status)">
+                <p class="text-xs uppercase tracking-wider font-semibold opacity-80">Stato attuale</p>
+                <p class="font-display text-xl font-bold mt-1">{{ balanceStatusLabel(b.status) }}</p>
+                <p class="text-xs mt-1 opacity-80">
+                    @if (isAdminView()) {
+                    @if (b.status === 'draft') { Modificabile dall'admin direttamente da questa pagina. }
+                    @else { Bilancio consegnato: riaprilo in bozza per modificarlo. }
+                    } @else {
+                    @if (b.status === 'draft') { Modificabile dalla squadra fino all'invio definitivo. }
+                    @else { Gia consegnato e bloccato per la squadra. }
+                    }
+                </p>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+                <div class="stat-tile">
+                    <p class="stat-label">Ricavi</p>
+                    <p class="stat-value text-success">{{ compileTotals().ricavi | number:'1.0-2' }}</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Costi</p>
+                    <p class="stat-value text-danger">{{ compileTotals().costi | number:'1.0-2' }}</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Ammort.</p>
+                    <p class="stat-value">{{ compileTotals().ammortamenti | number:'1.0-2' }}</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Plus/Minus</p>
+                    <p class="stat-value">{{ compileTotals().plus_minus | number:'1.0-2' }}</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Utile</p>
+                    <p class="stat-value" [class.text-success]="compileTotals().utile>=0"
+                        [class.text-danger]="compileTotals().utile<0">{{ compileTotals().utile | number:'1.0-2' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid xl:grid-cols-[0.9fr_1.1fr] gap-4">
+            <section class="card p-5 space-y-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wider text-text-tertiary">Step 1</p>
+                    <h3 class="section-title mt-1">Scelta stadio</h3>
+                    <p class="text-sm text-text-secondary mt-1">Lo stadio genera automaticamente ricavi e costi di
+                        gestione nel bilancio.</p>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-3">
+                    @for (stadium of stadiums(); track stadium.id) {
+                    <button type="button" class="text-left rounded-2xl border p-4 transition-all"
+                        [class.border-pitch]="selectedStadiumId() === stadium.id"
+                        [class.bg-success-soft]="selectedStadiumId() === stadium.id"
+                        [class.bg-surface]="selectedStadiumId() !== stadium.id"
+                        [class.border-border]="selectedStadiumId() !== stadium.id" (click)="selectStadium(stadium.id)">
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <div>
+                                <p class="font-display text-lg font-bold text-text">{{ stadium.name }}</p>
+                                <p class="text-xs text-text-tertiary">{{ stadium.city }}</p>
+                            </div>
+                            @if (selectedStadiumId() === stadium.id) {
+                            <span class="badge badge-success">Selezionato</span>
+                            }
+                        </div>
+                        <p class="text-sm text-text-secondary mb-3">{{ stadium.description }}</p>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="rounded-xl bg-surface-inset/70 px-3 py-2">
+                                <p class="uppercase tracking-wider text-text-tertiary">Ricavi</p>
+                                <p class="font-semibold text-success">{{ stadium.revenue | number:'1.0-2' }}</p>
+                            </div>
+                            <div class="rounded-xl bg-surface-inset/70 px-3 py-2">
+                                <p class="uppercase tracking-wider text-text-tertiary">Costi</p>
+                                <p class="font-semibold text-danger">{{ stadium.cost | number:'1.0-2' }}</p>
+                            </div>
+                        </div>
+                    </button>
+                    }
+                </div>
+            </section>
+
+            <section class="card p-5 space-y-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wider text-text-tertiary">Step 2</p>
+                    <h3 class="section-title mt-1">Ricavi e rettifiche guidate</h3>
+                    <p class="text-sm text-text-secondary mt-1">Completa solo le voci regolamentari non deducibili
+                        automaticamente dalla rosa.</p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    @for (field of guidedFields(); track fieldKey(field)) {
+                    <div class="rounded-2xl border border-border bg-surface p-4">
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <div>
+                                <p class="font-semibold text-text">{{ field.label }}</p>
+                                <p class="text-xs text-text-tertiary mt-1">{{ field.description }}</p>
+                            </div>
+                            <span class="badge badge-neutral">{{ sectionLabel(field.section) }}</span>
+                        </div>
+                        <input class="input w-full text-right" type="number" step="0.01"
+                            [disabled]="b.status !== 'draft'" title="Importo voce guidata" placeholder="0"
+                            [value]="field.amount"
+                            (input)="updateGuidedField(fieldKey(field), +$any($event.target).value)" />
+                    </div>
+                    }
+                </div>
+            </section>
+        </div>
+
+        <div class="grid xl:grid-cols-2 gap-4">
+            <section class="card p-5 space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider text-text-tertiary">Step 3</p>
+                        <h3 class="section-title mt-1">Voci automatiche</h3>
+                    </div>
+                </div>
+                @for (sec of ['ricavi','costi','ammortamenti']; track sec) {
+                @if (autoEntriesBySection()[sec].length > 0) {
+                <div class="rounded-2xl border border-border bg-surface overflow-hidden">
+                    <div
+                        class="px-4 py-3 border-b border-border bg-surface-inset/60 flex items-center justify-between gap-2">
+                        <p class="font-semibold text-text">{{ sectionLabel(sec) }}</p>
+                        <span class="badge badge-info">auto</span>
+                    </div>
+                    <div class="divide-y divide-border">
+                        @for (roleGroup of autoRoleGroups(sec); track roleGroup.role) {
+                        <div>
+                            @if (sec !== 'ricavi') {
+                            <button type="button"
+                                class="w-full px-4 py-2 bg-surface-inset/40 border-b border-border/70 flex items-center justify-between gap-2 text-left"
+                                (click)="toggleCompileGroup(sec, roleGroup.role)">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-text-tertiary">{{ isCompileGroupCollapsed(sec, roleGroup.role) ?
+                                        '▸' : '▾' }}</span>
+                                    <p class="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{{
+                                        roleLabel(roleGroup.role) }}</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-semibold text-text-secondary tabular-nums">{{
+                                        groupTotal(roleGroup.entries) | number:'1.2-2' }}</span>
+                                    <span class="badge badge-neutral">{{ roleGroup.entries.length }}</span>
+                                </div>
+                            </button>
+                            }
+                            @if (sec === 'ricavi' || !isCompileGroupCollapsed(sec, roleGroup.role)) {
+                            <div class="divide-y divide-border/70">
+                                @for (entry of roleGroup.entries; track autoEntryKey(entry)) {
+                                <div class="px-4 py-3 flex items-center justify-between gap-3 text-sm">
+                                    <div>
+                                        @if (isPlayerEntry(entry)) {
+                                        <button type="button" class="text-left text-pitch hover:underline"
+                                            (click)="openPlayerDetail(entry, b.team_id)">{{ entry.label }}</button>
+                                        } @else {
+                                        <p class="text-text-secondary">{{ entry.label }}</p>
+                                        }
+                                        @if (entryPlayerDetail(entry)) {
+                                        <p class="text-xs text-text-tertiary mt-1">{{ entryPlayerDetail(entry) }}</p>
+                                        }
+                                    </div>
+                                    <span class="font-semibold text-text tabular-nums">{{ entry.amount | number:'1.0-2'
+                                        }}</span>
+                                </div>
+                                }
+                            </div>
+                            }
+                        </div>
+                        }
+                    </div>
+                </div>
+                }
+                }
+            </section>
+
+            <section class="card p-5 space-y-4">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider text-text-tertiary">Step 4</p>
+                        <h3 class="section-title mt-1">Voci extra manuali</h3>
+                        <p class="text-sm text-text-secondary mt-1">Usa queste righe solo per eccezioni non coperte
+                            dalle voci guidate sopra.</p>
+                    </div>
+                    @if (b.status === 'draft') {
+                    <div class="flex flex-wrap gap-2">
+                        @for (sec of ['ricavi','costi','ammortamenti','plus_minus']; track sec) {
+                        <button class="btn btn-ghost btn-sm" (click)="addExtraManualEntry(sec)">+ {{ sectionLabel(sec)
+                            }}</button>
+                        }
+                    </div>
+                    }
+                </div>
+                @for (sec of ['ricavi','costi','ammortamenti','plus_minus']; track sec) {
+                <div class="rounded-2xl border border-border bg-surface overflow-hidden">
+                    <div class="px-4 py-3 border-b border-border bg-surface-inset/60">
+                        <p class="font-semibold text-text">{{ sectionLabel(sec) }}</p>
+                    </div>
+                    <div class="divide-y divide-border">
+                        @for (it of extraEntriesBySection(sec); track it.index) {
+                        <div class="px-4 py-3 grid grid-cols-[minmax(0,1fr)_140px_auto] gap-2 items-center">
+                            <input class="input" title="Descrizione voce extra" placeholder="Descrizione"
+                                [disabled]="b.status !== 'draft'" [value]="it.entry.label"
+                                (input)="updateExtraManualEntry(it.index, { label: $any($event.target).value })" />
+                            <input class="input text-right" type="number" step="0.01" title="Importo voce extra"
+                                placeholder="0" [disabled]="b.status !== 'draft'" [value]="it.entry.amount"
+                                (input)="updateExtraManualEntry(it.index, { amount: +$any($event.target).value })" />
+                            <div class="text-right">
+                                @if (b.status === 'draft') {
+                                <button class="btn btn-danger btn-sm"
+                                    (click)="removeExtraManualEntry(it.index)">×</button>
+                                }
+                            </div>
+                        </div>
+                        } @empty {
+                        <div class="px-4 py-3 text-sm text-text-tertiary">Nessuna voce extra.</div>
+                        }
+                    </div>
+                </div>
+                }
+            </section>
+        </div>
+
+        <div class="flex flex-wrap gap-2 justify-end">
+            <button class="btn btn-ghost" (click)="loadCompile()">Ricarica</button>
+            @if (b.status === 'draft' && isAdminView()) {
+            <button class="btn btn-secondary" [disabled]="compileSaving()" (click)="saveCompileDraft()">{{
+                compileSaving() ? 'Salvataggio…' : 'Salva modifiche' }}</button>
+            }
+            @if (b.status === 'draft' && canUploadAsTeam()) {
+            <button class="btn btn-secondary" [disabled]="compileSaving()" (click)="saveCompileDraft()">{{
+                compileSaving() ? 'Salvataggio…' : 'Salva bozza' }}</button>
+            <button class="btn btn-primary" [disabled]="compileSaving()" (click)="submitCompile()">Invia
+                definitivo</button>
+            }
+            @if (b.status !== 'draft' && admin.isAdmin()) {
+            <button class="btn btn-secondary" (click)="reopenCompile()">Riapri come bozza</button>
+            }
+        </div>
+        } @else if (!compileLoading()) {
+        <div class="card p-6 text-center space-y-3">
+            @if (isAdminView()) {
+            <p class="text-sm text-text-secondary">Seleziona un bilancio da Bilanci pubblicati e clicca Apri e modifica.
+            </p>
+            }
+            @if (!isAdminView()) {
+            <button class="btn btn-primary" (click)="loadCompile()">Carica/crea la mia bozza</button>
+            }
+        </div>
+        }
+        }
+    </div>
+    }
+
+    @if (playerDetail(); as player) {
+    <app-player-detail-modal [player]="player" (close)="closePlayerDetail()" />
+    }
+</div>

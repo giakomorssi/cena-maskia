@@ -1,0 +1,64 @@
+<div class="min-h-screen bg-surface">
+  <!-- Mobile header -->
+  <header
+    class="md:hidden flex items-center justify-between h-14 px-4 border-b border-border bg-surface-raised/95 backdrop-blur sticky top-0 z-30">
+    <button (click)="toggleSidebar()"
+      class="p-1.5 rounded-md text-text-secondary hover:text-text hover:bg-surface-inset transition-colors"
+      aria-label="Open menu">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+      </svg>
+    </button>
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-lg flex items-center justify-center bg-brand-grad">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 text-white">
+          <circle cx="12" cy="12" r="9" />
+        </svg>
+      </div>
+      <span class="font-display text-sm font-bold text-text">{{ pageMeta().title }}</span>
+    </div>
+    @if (admin.isAdmin()) {
+    <span class="badge badge-success">ON</span>
+    } @else if (teamSession.isLoggedIn()) {
+    <span class="badge badge-gold">TEAM</span>
+    } @else {
+    <span class="w-8"></span>
+    }
+  </header>
+
+  <!-- Overlay -->
+  @if (showOverlay()) {
+  <div class="fixed inset-0 bg-overlay-navy backdrop-blur-sm z-40 md:hidden" (click)="closeSidebar()"></div>
+  }
+
+  <!-- Sidebar -->
+  <app-sidebar [isOpen]="isSidebarOpen()" [isMobile]="isMobile()" (closeSidebar)="closeSidebar()"></app-sidebar>
+
+  <!-- Main content -->
+  <main class="md:pl-64 min-h-[calc(100vh-3.5rem)] md:min-h-screen">
+    <!-- Desktop topbar -->
+    <div
+      class="hidden md:flex items-center justify-between gap-4 h-16 px-8 lg:px-10 border-b border-border bg-surface-raised/70 backdrop-blur sticky top-0 z-20">
+      <div class="flex items-center gap-2 text-sm">
+        <a routerLink="/" class="text-text-tertiary hover:text-pitch transition-colors">CENA MASKIA CHAMPIONSHIP</a>
+        <span class="text-text-tertiary">/</span>
+        <span class="font-medium text-text">{{ pageMeta().title }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (admin.isAdmin()) {
+        <span class="badge badge-success">
+          <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+          Admin
+        </span>
+        } @else if (teamSession.isLoggedIn()) {
+        <span class="badge badge-gold">{{ teamSession.team()?.name }}</span>
+        }
+      </div>
+    </div>
+
+    <!-- Page content -->
+    <div class="animate-fade">
+      <router-outlet></router-outlet>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,243 @@
+<div class="max-w-6xl mx-auto px-6 lg:px-10 py-10">
+    <header class="page-header mb-6">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge badge-neutral">🔐 Admin</span>
+                    <span class="badge badge-info">📊 Bilancio</span>
+                </div>
+                <h1 class="page-title">Editor bilancio admin</h1>
+                <p class="page-subtitle">Pagina dedicata per aprire, correggere e salvare il bilancio selezionato.</p>
+            </div>
+            <button class="btn btn-ghost" (click)="backToAdmin()">← Torna ad admin</button>
+        </div>
+    </header>
+
+    @if (!admin.isAdmin()) {
+    <div class="alert alert-warning">Accesso admin richiesto.</div>
+    } @else {
+    @if (message()) {
+    <div class="alert alert-success mb-4">{{ message() }}</div>
+    }
+    @if (error()) {
+    <div class="alert alert-error mb-4">{{ error() }}</div>
+    }
+    @if (loading()) {
+    <div class="card p-6 text-center text-text-secondary">Caricamento bilancio…</div>
+    } @else if (compileBalance(); as b) {
+    <div class="space-y-5">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+                <p class="text-xs uppercase tracking-wider text-text-tertiary">Editor admin</p>
+                <h2 class="section-title mt-1">{{ teamName(b.team_id) }} · {{ seasonName(b.season_id) }}</h2>
+                <p class="text-sm text-text-secondary mt-1">Tutte le voci sono modificabili dall'admin. I totali vengono ricalcolati al salvataggio.</p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <button class="btn btn-ghost" (click)="reloadBalance()">Ricarica</button>
+                @if (b.status !== 'draft') {
+                <button class="btn btn-secondary" (click)="reopenBalanceEditor()">Riapri come bozza</button>
+                }
+                <button class="btn btn-primary" [disabled]="saving()" (click)="saveBalanceChanges()">{{ saving() ? 'Salvataggio…' : 'Salva modifiche' }}</button>
+            </div>
+        </div>
+
+        <div class="grid xl:grid-cols-[1.2fr_0.8fr] gap-4">
+            <section class="card p-5 space-y-4">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider text-text-tertiary">Bilancio guidato</p>
+                        <h3 class="section-title mt-1">Voci automatiche dalla squadra</h3>
+                        <p class="text-sm text-text-secondary mt-1">Stipendi, ammortamenti, mercato e multe restano visibili e ricalcolati dal backend.</p>
+                    </div>
+                    <span class="badge badge-success">{{ autoEntries().length + (selectedStadiumId() ? 2 : 0) }} voci auto</span>
+                </div>
+
+                <div class="grid sm:grid-cols-3 gap-3">
+                    <div class="stat-tile">
+                        <p class="stat-label">Stipendi e rosa</p>
+                        <p class="stat-value">{{ autoEntriesBySection()['costi'].length }}</p>
+                        <p class="stat-hint">costi automatici</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-label">Ammortamenti</p>
+                        <p class="stat-value">{{ autoEntriesBySection()['ammortamenti'].length }}</p>
+                        <p class="stat-hint">calcolati da fascia</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-label">Warning</p>
+                        <p class="stat-value" [class.text-danger]="compileIssues().length > 0">{{ compileIssues().length }}</p>
+                        <p class="stat-hint">da verificare</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card p-5 space-y-3">
+                <p class="text-xs uppercase tracking-wider text-text-tertiary">Revisione</p>
+                <h3 class="section-title">Controlli automatici</h3>
+                @if (compileIssues().length === 0) {
+                <div class="rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm text-pitch-dark">
+                    Nessun warning evidente sul bilancio selezionato.
+                </div>
+                } @else {
+                <div class="space-y-2">
+                    @for (issue of compileIssues(); track issue.code) {
+                    <div class="rounded-xl border border-border bg-surface-inset/60 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-text">{{ issue.label }}</p>
+                                <p class="text-sm text-text-secondary mt-1">{{ issue.detail }}</p>
+                            </div>
+                            <span [class]="issueClass(issue)">{{ issue.severity }}</span>
+                        </div>
+                    </div>
+                    }
+                </div>
+                }
+            </section>
+        </div>
+
+        <div class="card p-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-xs uppercase text-text-tertiary tracking-wider">Stato</p>
+                <p class="font-display text-lg font-bold"><span [class]="balanceStatusBadgeClass(b.status)">{{ balanceStatusLabel(b.status) }}</span></p>
+                <p class="text-xs text-text-tertiary mt-1">Bilancio squadra {{ teamName(b.team_id) }}</p>
+            </div>
+            <div class="rounded-xl border px-4 py-3 min-w-52" [class]="balanceStatusPanelClass(b.status)">
+                <p class="text-xs uppercase tracking-wider font-semibold opacity-80">Stato attuale</p>
+                <p class="font-display text-xl font-bold mt-1">{{ balanceStatusLabel(b.status) }}</p>
+                <p class="text-xs mt-1 opacity-80">
+                    @if (b.status === 'draft') { Bilancio in bozza, ancora aperto. }
+                    @else { Bilancio gia consegnato, ma modificabile dall'admin. }
+                </p>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+                <div class="stat-tile"><p class="stat-label">Ricavi</p><p class="stat-value text-success">{{ compileTotals().ricavi | number:'1.0-2' }}</p></div>
+                <div class="stat-tile"><p class="stat-label">Costi</p><p class="stat-value text-danger">{{ compileTotals().costi | number:'1.0-2' }}</p></div>
+                <div class="stat-tile"><p class="stat-label">Ammort.</p><p class="stat-value">{{ compileTotals().ammortamenti | number:'1.0-2' }}</p></div>
+                <div class="stat-tile"><p class="stat-label">Plus/Minus</p><p class="stat-value">{{ compileTotals().plus_minus | number:'1.0-2' }}</p></div>
+                <div class="stat-tile"><p class="stat-label">Utile</p><p class="stat-value" [class.text-success]="compileTotals().utile >= 0" [class.text-danger]="compileTotals().utile < 0">{{ compileTotals().utile | number:'1.0-2' }}</p></div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border-2 p-5" [class]="sanctionPanelClass(b.sanction_level)">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wider font-bold opacity-70">Risultato netto</p>
+                    <p class="font-display text-3xl font-extrabold mt-1">{{ compileTotals().utile | number:'1.2-2' }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs uppercase tracking-wider font-bold opacity-70">Sanzione stimata</p>
+                    <p class="font-display text-xl font-bold mt-1">{{ sanctionLabel(b.sanction_level) }}</p>
+                    <p class="text-xs">{{ b.sanction_points }} punti</p>
+                </div>
+            </div>
+            @if (b.sanction_notes) { <p class="text-xs mt-3 opacity-80">{{ b.sanction_notes }}</p> }
+        </div>
+
+        <div class="grid xl:grid-cols-[0.9fr_1.1fr] gap-4">
+            <section class="card p-5 space-y-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wider text-text-tertiary">Step 1</p>
+                    <h3 class="section-title mt-1">Scelta stadio</h3>
+                    <p class="text-sm text-text-secondary mt-1">La selezione aggiorna automaticamente ricavi e costi di gestione.</p>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-3">
+                    @for (stadium of stadiums(); track stadium.id) {
+                    <button type="button" class="text-left rounded-2xl border p-4 transition-all" [class.border-pitch]="selectedStadiumId() === stadium.id" [class.bg-success-soft]="selectedStadiumId() === stadium.id" [class.bg-surface]="selectedStadiumId() !== stadium.id" [class.border-border]="selectedStadiumId() !== stadium.id" (click)="selectStadium(stadium.id)">
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <div><p class="font-display text-lg font-bold text-text">{{ stadium.name }}</p><p class="text-xs text-text-tertiary">{{ stadium.city }}</p></div>
+                            @if (selectedStadiumId() === stadium.id) {<span class="badge badge-success">Selezionato</span>}
+                        </div>
+                        <p class="text-sm text-text-secondary mb-3">{{ stadium.description }}</p>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="rounded-xl bg-surface-inset/70 px-3 py-2"><p class="uppercase tracking-wider text-text-tertiary">Ricavi</p><p class="font-semibold text-success">{{ stadium.revenue | number:'1.0-2' }}</p></div>
+                            <div class="rounded-xl bg-surface-inset/70 px-3 py-2"><p class="uppercase tracking-wider text-text-tertiary">Costi</p><p class="font-semibold text-danger">{{ stadium.cost | number:'1.0-2' }}</p></div>
+                        </div>
+                    </button>
+                    }
+                </div>
+            </section>
+
+            <section class="card p-5 space-y-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wider text-text-tertiary">Step 2</p>
+                    <h3 class="section-title mt-1">Ricavi e rettifiche guidate</h3>
+                    <p class="text-sm text-text-secondary mt-1">L'admin puo correggere tutte le voci guidate e lasciare al backend la normalizzazione finale.</p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    @for (field of guidedFields(); track fieldKey(field)) {
+                    <div class="rounded-2xl border border-border bg-surface p-4">
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <div><p class="font-semibold text-text">{{ field.label }}</p><p class="text-xs text-text-tertiary mt-1">{{ field.description }}</p></div>
+                            <span class="badge badge-neutral">{{ sectionLabel(field.section) }}</span>
+                        </div>
+                        <input class="input w-full text-right" type="number" step="0.01" title="Importo voce guidata" placeholder="0" [value]="field.amount" (input)="updateGuidedField(fieldKey(field), +$any($event.target).value)" />
+                    </div>
+                    }
+                </div>
+            </section>
+        </div>
+
+        <div class="grid xl:grid-cols-2 gap-4">
+            <section class="card p-5 space-y-4">
+                <div><p class="text-xs uppercase tracking-wider text-text-tertiary">Step 3</p><h3 class="section-title mt-1">Voci automatiche</h3></div>
+                @for (sec of ['ricavi','costi','ammortamenti']; track sec) {
+                @if (autoEntriesBySection()[sec].length > 0) {
+                <div class="rounded-2xl border border-border bg-surface overflow-hidden">
+                    <div class="px-4 py-3 border-b border-border bg-surface-inset/60 flex items-center justify-between gap-2"><p class="font-semibold text-text">{{ sectionLabel(sec) }}</p><span class="badge badge-info">auto</span></div>
+                    <div class="divide-y divide-border">
+                        @for (roleGroup of autoRoleGroups(sec); track roleGroup.role) {
+                        <div>
+                            @if (sec !== 'ricavi') {
+                            <button type="button" class="w-full px-4 py-2 bg-surface-inset/40 border-b border-border/70 flex items-center justify-between gap-2 text-left" (click)="toggleCompileGroup(sec, roleGroup.role)">
+                                <div class="flex items-center gap-2"><span class="text-text-tertiary">{{ isCompileGroupCollapsed(sec, roleGroup.role) ? '▸' : '▾' }}</span><p class="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{{ roleLabel(roleGroup.role) }}</p></div>
+                                <div class="flex items-center gap-2"><span class="text-xs font-semibold text-text-secondary tabular-nums">{{ groupTotal(roleGroup.entries) | number:'1.2-2' }}</span><span class="badge badge-neutral">{{ roleGroup.entries.length }}</span></div>
+                            </button>
+                            }
+                            @if (sec === 'ricavi' || !isCompileGroupCollapsed(sec, roleGroup.role)) {
+                            <div class="divide-y divide-border/70">
+                                @for (entry of roleGroup.entries; track autoEntryKey(entry)) {
+                                <div class="px-4 py-3 flex items-center justify-between gap-3 text-sm">
+                                    <div><p class="text-text-secondary">{{ entry.label }}</p>@if (entryPlayerDetail(entry)) {<p class="text-xs text-text-tertiary mt-1">{{ entryPlayerDetail(entry) }}</p>}</div>
+                                    <span class="font-semibold text-text tabular-nums">{{ entry.amount | number:'1.0-2' }}</span>
+                                </div>
+                                }
+                            </div>
+                            }
+                        </div>
+                        }
+                    </div>
+                </div>
+                }
+                }
+            </section>
+
+            <section class="card p-5 space-y-4">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div><p class="text-xs uppercase tracking-wider text-text-tertiary">Step 4</p><h3 class="section-title mt-1">Voci extra manuali</h3><p class="text-sm text-text-secondary mt-1">L'admin puo aggiungere, correggere e rimuovere tutte le voci extra.</p></div>
+                    <div class="flex flex-wrap gap-2">@for (sec of ['ricavi','costi','ammortamenti','plus_minus']; track sec) {<button class="btn btn-ghost btn-sm" (click)="addExtraManualEntry(sec)">+ {{ sectionLabel(sec) }}</button>}</div>
+                </div>
+                @for (sec of ['ricavi','costi','ammortamenti','plus_minus']; track sec) {
+                <div class="rounded-2xl border border-border bg-surface overflow-hidden">
+                    <div class="px-4 py-3 border-b border-border bg-surface-inset/60"><p class="font-semibold text-text">{{ sectionLabel(sec) }}</p></div>
+                    <div class="divide-y divide-border">
+                        @for (it of extraEntriesBySection(sec); track it.index) {
+                        <div class="px-4 py-3 grid grid-cols-[minmax(0,1fr)_140px_auto] gap-2 items-center">
+                            <input class="input" title="Descrizione voce extra" placeholder="Descrizione" [value]="it.entry.label" (input)="updateExtraManualEntry(it.index, { label: $any($event.target).value })" />
+                            <input class="input text-right" type="number" step="0.01" title="Importo voce extra" placeholder="0" [value]="it.entry.amount" (input)="updateExtraManualEntry(it.index, { amount: +$any($event.target).value })" />
+                            <div class="text-right"><button class="btn btn-danger btn-sm" (click)="removeExtraManualEntry(it.index)">×</button></div>
+                        </div>
+                        } @empty {
+                        <div class="px-4 py-3 text-sm text-text-tertiary">Nessuna voce extra.</div>
+                        }
+                    </div>
+                </div>
+                }
+            </section>
+        </div>
+    </div>
+    } @else {
+    <div class="card p-6 text-center text-text-secondary">Bilancio non trovato.</div>
+    }
+    }
+</div>

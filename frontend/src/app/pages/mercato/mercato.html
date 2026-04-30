@@ -1,0 +1,834 @@
+<div class="max-w-7xl mx-auto px-6 lg:px-10 py-10 space-y-6">
+    <header class="card p-6 md:p-8 overflow-hidden relative">
+        <div class="absolute inset-0 pointer-events-none opacity-70 market-hero-glow"></div>
+        <div class="relative space-y-3">
+            <div class="flex items-center gap-2">
+                <span class="badge badge-info">Mercato regolamentare</span>
+                <span class="badge badge-warning">Rose + bilancio</span>
+            </div>
+            <h1 class="page-title">Mercato</h1>
+            <p class="page-subtitle max-w-3xl">
+                La sezione segue il regolamento: proposta, accettazione, ratifica. Solo la ratifica aggiorna davvero
+                rose, conguagli, ammortamenti e plus/minus automatiche del bilancio.
+            </p>
+        </div>
+    </header>
+
+    <section class="grid xl:grid-cols-[1.4fr_1fr] gap-4">
+        <div class="card p-5 space-y-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary">Workflow ufficiale</p>
+                <h2 class="font-display text-2xl font-bold mt-1">Come funziona una trattativa</h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-3">
+                @for (step of WORKFLOW_STEPS; track step.code) {
+                <article class="rounded-2xl border border-border bg-surface-inset p-4 space-y-2">
+                    <p class="text-xs uppercase tracking-wide text-text-tertiary">{{ step.code }}</p>
+                    <h3 class="font-semibold text-lg">{{ step.title }}</h3>
+                    <p class="text-sm text-text-secondary">{{ step.summary }}</p>
+                </article>
+                }
+            </div>
+        </div>
+
+        <div class="card p-5 space-y-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary">Regole economiche</p>
+                <h2 class="font-display text-2xl font-bold mt-1">Impatto a bilancio</h2>
+            </div>
+            <div class="space-y-3">
+                @for (rule of ECONOMY_RULES; track rule.title) {
+                <article class="rounded-2xl border border-border bg-surface-inset p-4">
+                    <h3 class="font-semibold">{{ rule.title }}</h3>
+                    <p class="text-sm text-text-secondary mt-1">{{ rule.body }}</p>
+                </article>
+                }
+            </div>
+        </div>
+    </section>
+
+    <div class="flex flex-wrap items-center gap-2">
+        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+            Stagione
+            <select class="input mt-1" title="Stagione" [ngModel]="seasonId()" (ngModelChange)="onSeasonChange($event)">
+                @for (s of seasons(); track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+            </select>
+        </label>
+        <div class="flex flex-wrap gap-2 ml-auto">
+            <button class="chip" [class.chip-active]="tab()==='mine'" (click)="setTab('mine')">Le mie proposte</button>
+            <button class="chip" [class.chip-active]="tab()==='history'" (click)="setTab('history')">Storico
+                ratificati</button>
+            @if (isTeam()) {
+            <button class="chip" [class.chip-active]="tab()==='new'" (click)="setTab('new')">Nuova proposta</button>
+            <button class="chip" [class.chip-active]="tab()==='cestino'" (click)="setTab('cestino')">🗑 Cestino</button>
+            }
+            @if (isAdmin()) {
+            <button class="chip" [class.chip-active]="tab()==='admin'" (click)="setTab('admin')">Backoffice</button>
+            }
+        </div>
+    </div>
+
+    @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
+    @if (message()) { <div class="alert alert-success">{{ message() }}</div> }
+
+    @if (tab()==='mine' || tab()==='admin') {
+    @if (!isAdmin() && !isTeam()) {
+    <div class="alert alert-warning">Accedi come squadra o admin per vedere le proposte.</div>
+    } @else if (activeTrades().length === 0) {
+    <div class="empty-state">
+        <p class="font-semibold">Nessuna proposta</p>
+        <p class="text-sm">Qui compariranno trattative in corso, accettate o gia' ratificate.</p>
+    </div>
+    } @else {
+    <div class="space-y-4">
+        @for (t of activeTrades(); track t.id) {
+        @let detail = parseTradeNotes(t.notes);
+        <article class="card overflow-hidden">
+
+            <!-- Formula header -->
+            <div class="px-5 py-3 border-b border-border flex flex-wrap items-center justify-between gap-3"
+                [class.bg-amber-50]="t.kind==='swap'" [class.bg-green-50]="t.kind==='buy'"
+                [class.bg-red-50]="t.kind==='sell'" [class.bg-blue-50]="t.kind==='loan'">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span [class]="formulaBadgeClass(t)">{{ proposalDisplayLabel(t) }}</span>
+                    <span [class]="STATUS_BADGE[t.status] || 'badge'">{{ STATUS_LABEL[t.status] || t.status }}</span>
+                </div>
+                <p class="text-xs text-text-tertiary">{{ t.created_at | date:'dd/MM/yyyy HH:mm' }}</p>
+            </div>
+
+            <div class="px-5 py-4 space-y-4">
+
+                <!-- Teams + financial summary row -->
+                <div class="flex flex-wrap items-stretch gap-3">
+                    <!-- Proposer -->
+                    <div class="rounded-xl bg-surface-inset border border-border px-3 py-2 flex items-center gap-2">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-brand-grad flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            {{ (t.from_team_name || teamName(t.from_team_id)).charAt(0).toUpperCase() }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] uppercase tracking-wide text-text-tertiary">Proponente</p>
+                            <p class="font-semibold text-sm leading-tight truncate">{{ t.from_team_name ||
+                                teamName(t.from_team_id) }}</p>
+                        </div>
+                    </div>
+                    <svg class="w-4 h-4 text-text-tertiary self-center shrink-0" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                    <!-- Counterparty -->
+                    <div class="rounded-xl bg-surface-inset border border-border px-3 py-2 flex items-center gap-2">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-surface border-2 border-border flex items-center justify-center text-text text-xs font-bold shrink-0">
+                            {{ (t.to_team_name || teamName(t.to_team_id)).charAt(0).toUpperCase() }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] uppercase tracking-wide text-text-tertiary">Controparte</p>
+                            <p class="font-semibold text-sm leading-tight truncate">{{ t.to_team_name ||
+                                teamName(t.to_team_id) }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Financial chips -->
+                    <div class="flex flex-wrap items-center gap-2 ml-auto">
+                        @if (t.cash_amount) {
+                        <div class="rounded-xl border border-border bg-surface-inset px-3 py-2 text-center">
+                            <p class="text-[10px] uppercase tracking-wide text-text-tertiary">Conguaglio immediato</p>
+                            <p class="font-bold text-base leading-tight">{{ t.cash_amount | number:'1.0-2' }}</p>
+                        </div>
+                        }
+                        @if (detail["Prezzo riscatto"]) {
+                        <div class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-center">
+                            <p class="text-[10px] uppercase tracking-wide text-red-500">Prezzo riscatto</p>
+                            <p class="font-bold text-base leading-tight text-red-700">{{ detail["Prezzo riscatto"] }}
+                            </p>
+                        </div>
+                        }
+                        @if (detail["Modalita' pagamento"]) {
+                        <div class="rounded-xl border border-border bg-surface-inset px-3 py-2 text-center">
+                            <p class="text-[10px] uppercase tracking-wide text-text-tertiary">Pagamento</p>
+                            <p class="font-semibold text-sm leading-tight capitalize">{{ detail["Modalita' pagamento"]
+                                }}</p>
+                        </div>
+                        }
+                        @if (detail["Destinazione contrattuale"]) {
+                        <div class="rounded-xl border border-border bg-surface-inset px-3 py-2 text-center">
+                            <p class="text-[10px] uppercase tracking-wide text-text-tertiary">Contratto</p>
+                            <p class="font-semibold text-sm leading-tight">{{ detail["Destinazione contrattuale"] }}</p>
+                        </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Players transfer grid -->
+                <div class="grid lg:grid-cols-2 gap-3 text-sm">
+                    <!-- From proposer -->
+                    <section class="rounded-2xl border border-amber-200 overflow-hidden">
+                        <div class="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200">
+                            <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                            <p class="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+                                Cede: {{ t.from_team_name || teamName(t.from_team_id) }}
+                            </p>
+                        </div>
+                        <div class="p-3 space-y-2 bg-amber-50/30 min-h-12">
+                            @for (it of itemsByDirection(t, 'from_proposer'); track it.id) {
+                            <div class="rounded-xl bg-surface border border-amber-100 px-3 py-2">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p class="font-semibold">{{ it.player_name }}
+                                            <span class="font-normal text-text-tertiary text-xs ml-1">{{ it.player_role
+                                                }}</span>
+                                        </p>
+                                        <p class="text-xs text-text-secondary mt-0.5">{{
+                                            ACQ_LABEL[it.acquisition_type_after || ''] || it.acquisition_type_after }}
+                                        </p>
+                                    </div>
+                                    <div class="flex gap-3 shrink-0 text-right">
+                                        @if (it.salary_after != null) {
+                                        <div>
+                                            <p class="text-[10px] text-text-tertiary">Stipendio</p>
+                                            <p class="text-sm font-semibold">{{ it.salary_after | number:'1.0-2' }}</p>
+                                        </div>
+                                        }
+                                        @if (it.contract_years_after != null) {
+                                        <div>
+                                            <p class="text-[10px] text-text-tertiary">Anni</p>
+                                            <p class="text-sm font-semibold">{{ it.contract_years_after }}</p>
+                                        </div>
+                                        }
+                                        @if (it.market_value_after != null) {
+                                        <div>
+                                            <p class="text-[10px] text-text-tertiary">Val. mkt</p>
+                                            <p class="text-sm font-semibold">{{ it.market_value_after | number:'1.0-2'
+                                                }}</p>
+                                        </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            } @empty {
+                            <p class="text-xs text-text-tertiary px-1 py-1">Nessun giocatore ceduto dal proponente.</p>
+                            }
+                        </div>
+                    </section>
+
+                    <!-- From counterparty -->
+                    <section class="rounded-2xl border border-blue-200 overflow-hidden">
+                        <div class="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200">
+                            <svg class="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                            </svg>
+                            <p class="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                                Cede: {{ t.to_team_name || teamName(t.to_team_id) }}
+                            </p>
+                        </div>
+                        <div class="p-3 space-y-2 bg-blue-50/30 min-h-12">
+                            @for (it of itemsByDirection(t, 'from_counterparty'); track it.id) {
+                            <div class="rounded-xl bg-surface border border-blue-100 px-3 py-2">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p class="font-semibold">{{ it.player_name }}
+                                            <span class="font-normal text-text-tertiary text-xs ml-1">{{ it.player_role
+                                                }}</span>
+                                        </p>
+                                        <p class="text-xs text-text-secondary mt-0.5">{{
+                                            ACQ_LABEL[it.acquisition_type_after || ''] || it.acquisition_type_after }}
+                                        </p>
+                                    </div>
+                                    <div class="flex gap-3 shrink-0 text-right">
+                                        @if (it.salary_after != null) {
+                                        <div>
+                                            <p class="text-[10px] text-text-tertiary">Stipendio</p>
+                                            <p class="text-sm font-semibold">{{ it.salary_after | number:'1.0-2' }}</p>
+                                        </div>
+                                        }
+                                        @if (it.contract_years_after != null) {
+                                        <div>
+                                            <p class="text-[10px] text-text-tertiary">Anni</p>
+                                            <p class="text-sm font-semibold">{{ it.contract_years_after }}</p>
+                                        </div>
+                                        }
+                                        @if (it.market_value_after != null) {
+                                        <div>
+                                            <p class="text-[10px] text-text-tertiary">Val. mkt</p>
+                                            <p class="text-sm font-semibold">{{ it.market_value_after | number:'1.0-2'
+                                                }}</p>
+                                        </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            } @empty {
+                            <p class="text-xs text-text-tertiary px-1 py-1">Nessun giocatore ricevuto dalla controparte.
+                            </p>
+                            }
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Status hint -->
+                <p class="text-xs text-text-secondary">{{ flowHint(t.status) }}</p>
+
+                @if (detail["Note"] || t.admin_notes) {
+                <div class="grid md:grid-cols-2 gap-3 text-sm">
+                    @if (detail["Note"]) {
+                    <div class="rounded-2xl border border-border bg-surface-inset p-4">
+                        <p class="text-xs uppercase tracking-wide text-text-tertiary">Note proposta</p>
+                        <p class="mt-1 text-text-secondary">{{ detail["Note"] }}</p>
+                    </div>
+                    }
+                    @if (t.admin_notes) {
+                    <div class="rounded-2xl border border-border bg-surface-inset p-4">
+                        <p class="text-xs uppercase tracking-wide text-text-tertiary">Note admin</p>
+                        <p class="mt-1 text-text-secondary">{{ t.admin_notes }}</p>
+                    </div>
+                    }
+                </div>
+                }
+            </div>
+
+            <footer class="flex flex-wrap gap-2 justify-end px-5 py-3 bg-surface-inset border-t border-border">
+                @if (t.status === 'proposed' && isTeam() && currentTeamId() === t.to_team_id) {
+                <button class="btn btn-primary btn-sm" (click)="accept(t)">Accetta</button>
+                <button class="btn btn-danger btn-sm" (click)="reject(t)">Rifiuta</button>
+                }
+                @if (t.status === 'proposed' && isTeam() && currentTeamId() === t.from_team_id) {
+                <button class="btn btn-ghost btn-sm" (click)="cancel(t)">Annulla</button>
+                }
+                @if (t.status === 'accepted' && isAdmin()) {
+                <button class="btn btn-primary btn-sm" (click)="ratify(t)">Ratifica e aggiorna</button>
+                <button class="btn btn-danger btn-sm" (click)="reject(t)">Rifiuta</button>
+                }
+            </footer>
+        </article>
+        }
+    </div>
+    }
+    }
+
+    @if (tab()==='cestino') {
+    @if (!isTeam() && !isAdmin()) {
+    <div class="alert alert-warning">Accedi come squadra per gestire il cestino.</div>
+    } @else {
+    <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-border">
+            <h2 class="font-display text-xl font-bold">Cestino</h2>
+            <p class="text-sm text-text-secondary mt-1">Proposte rifiutate o annullate. Puoi eliminarle definitivamente
+                o ripristinarle allo stato iniziale.</p>
+        </div>
+        @if (trashedTrades().length === 0) {
+        <div class="empty-state">
+            <p class="font-semibold">Cestino vuoto</p>
+            <p class="text-sm">Nessuna proposta rifiutata o annullata.</p>
+        </div>
+        } @else {
+        <div class="divide-y divide-border">
+            @for (t of trashedTrades(); track t.id) {
+            @let detail = parseTradeNotes(t.notes);
+            <div class="px-5 py-4 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span [class]="formulaBadgeClass(t)">{{ proposalDisplayLabel(t) }}</span>
+                        <span [class]="STATUS_BADGE[t.status] || 'badge'">{{ STATUS_LABEL[t.status] || t.status
+                            }}</span>
+                        <span class="text-sm font-medium">{{ t.from_team_name || teamName(t.from_team_id) }} → {{
+                            t.to_team_name || teamName(t.to_team_id) }}</span>
+                    </div>
+                    <p class="text-xs text-text-tertiary">{{ t.created_at | date:'dd/MM/yyyy HH:mm' }}</p>
+                </div>
+                @if (t.items.length > 0) {
+                <p class="text-xs text-text-secondary">
+                    Giocatori: @for (it of t.items; track it.id) { {{ it.player_name }}@if (!$last) { · } }
+                </p>
+                }
+                @if (detail["Note"]) {
+                <p class="text-xs text-text-secondary italic">{{ detail["Note"] }}</p>
+                }
+                <div class="flex gap-2">
+                    @if (isAdmin() || currentTeamId() === t.from_team_id) {
+                    <button class="btn btn-primary btn-sm" (click)="restore(t)">Ripristina</button>
+                    <button class="btn btn-danger btn-sm" (click)="permanentDelete(t)">Elimina definitivamente</button>
+                    }
+                </div>
+            </div>
+            }
+        </div>
+        }
+    </div>
+    }
+    }
+
+    @if (tab()==='history') {
+    <div class="card p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="font-display text-2xl font-bold">Storico ratificati</h2>
+                <p class="text-sm text-text-secondary mt-1">Sono mostrati solo i trasferimenti sportivi ratificati. Le
+                    righe automatiche di bilancio restano interne al calcolo del bilancio.</p>
+            </div>
+        </div>
+        <div class="alert alert-warning text-sm">
+            <strong>Nota:</strong> le proposte <em>accettate ma in attesa di ratifica</em> non compaiono qui — cercale
+            nel tab <button class="underline font-semibold" (click)="setTab('mine')">Le mie proposte</button>.
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-surface-inset text-text-tertiary text-xs uppercase">
+                    <tr>
+                        <th class="text-left px-3 py-2">Data</th>
+                        <th class="text-left px-3 py-2">Da</th>
+                        <th class="text-left px-3 py-2">A</th>
+                        <th class="text-left px-3 py-2">Giocatore</th>
+                        <th class="text-left px-3 py-2">Tipo</th>
+                        <th class="text-right px-3 py-2">Importo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (t of transfers(); track t.id) {
+                    <tr class="border-t border-border">
+                        <td class="px-3 py-2">{{ t.transfer_date | date:'dd/MM/yyyy' }}</td>
+                        <td class="px-3 py-2">{{ teamName(t.from_team_id) }}</td>
+                        <td class="px-3 py-2">{{ teamName(t.to_team_id) }}</td>
+                        <td class="px-3 py-2 font-medium">{{ t.player_name }}</td>
+                        <td class="px-3 py-2">{{ transferTypeLabel(t.type) }}</td>
+                        <td class="px-3 py-2 text-right">{{ t.fee | number:'1.0-2' }}</td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="6" class="px-3 py-6 text-center text-text-tertiary">Nessun trasferimento
+                            registrato.</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    }
+
+    @if (tab()==='new') {
+    @if (!isTeam()) {
+    <div class="alert alert-warning">Solo le squadre possono proporre operazioni di mercato.</div>
+    } @else {
+    <section class="grid xl:grid-cols-[0.9fr_1.7fr] gap-4 items-start">
+        <aside class="card p-5 space-y-4 sticky top-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary">Percorso proposta</p>
+                <h2 class="font-display text-2xl font-bold mt-1">Wizard Mercato</h2>
+                <p class="text-sm text-text-secondary mt-2">Step {{ wizardPageProgress() }}/{{
+                    PROPOSAL_WIZARD_PAGES.length }}. Ogni fase ha una pagina dedicata all'interno della sezione Mercato.
+                </p>
+            </div>
+            <div class="space-y-2">
+                @for (page of PROPOSAL_WIZARD_PAGES; track page.id) {
+                <button type="button" class="mercato-step-card w-full text-left"
+                    [class.mercato-step-card-active]="isWizardPageActive(page.id)"
+                    [class.mercato-step-card-complete]="isWizardPageCompleted(page.id) && !isWizardPageActive(page.id)"
+                    [class.mercato-step-card-locked]="!canAccessWizardPage(page.id) && !isWizardPageActive(page.id)"
+                    (click)="setWizardPage(page.id)">
+                    <div class="flex items-start justify-between gap-2">
+                        <p class="font-semibold">{{ page.title }}</p>
+                        @if (isWizardPageActive(page.id)) {
+                        <span class="mercato-step-indicator mercato-step-indicator-active">●</span>
+                        } @else if (isWizardPageCompleted(page.id)) {
+                        <span class="mercato-step-indicator mercato-step-indicator-done">✓</span>
+                        } @else if (!canAccessWizardPage(page.id)) {
+                        <span class="mercato-step-indicator mercato-step-indicator-locked">—</span>
+                        }
+                    </div>
+                    <p class="text-sm text-text-secondary mt-1">{{ page.summary }}</p>
+                </button>
+                }
+            </div>
+            <div class="rounded-2xl border border-border bg-surface-inset px-4 py-3 space-y-2">
+                <p class="text-xs uppercase tracking-wide text-text-tertiary">Snapshot</p>
+                <p class="text-sm"><strong>Formula:</strong> {{ proposalTypeLabel(wizard().proposalType) }}</p>
+                <p class="text-sm"><strong>Controparte:</strong> {{ selectedCounterparty()?.name || 'Da selezionare' }}
+                </p>
+                <p class="text-sm"><strong>Giocatori:</strong> {{ proposalCountLabel() }}</p>
+                <p class="text-sm"><strong>Conguaglio:</strong> {{ wizard().cash | number:'1.0-2' }}</p>
+            </div>
+        </aside>
+
+        <div class="space-y-4">
+            <section class="card p-5 space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary">Nuova proposta</p>
+                        <h2 class="font-display text-2xl font-bold mt-1">{{
+                            PROPOSAL_WIZARD_PAGES[wizardPageIndex()].title }}</h2>
+                        <p class="text-sm text-text-secondary mt-2">{{ PROPOSAL_WIZARD_PAGES[wizardPageIndex()].summary
+                            }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-border bg-surface-inset px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-text-tertiary">Stato wizard</p>
+                        <p class="font-semibold mt-1">{{ proposalCountLabel() }}</p>
+                    </div>
+                </div>
+
+                @if (isWizardPageActive('type')) {
+                <div class="grid xl:grid-cols-[1.1fr_0.9fr] gap-4">
+                    <div class="space-y-4">
+                        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+                            Tipo proposta
+                            <select class="input mt-1" title="Tipo" [ngModel]="wizard().proposalType"
+                                (ngModelChange)="setProposalType($event)">
+                                <option value="swap">Scambio</option>
+                                <option value="buy">Acquisto</option>
+                                <option value="sell">Vendita</option>
+                                <option value="loan_dry">Prestito secco</option>
+                                <option value="loan_with_right">Prestito con diritto di riscatto</option>
+                                <option value="loan_with_obligation">Prestito con obbligo di riscatto</option>
+                            </select>
+                        </label>
+                        <div class="rounded-2xl border border-border bg-surface-inset p-4 space-y-2">
+                            <p class="text-xs uppercase tracking-wide text-text-tertiary">Regola attiva</p>
+                            <p class="text-sm text-text-secondary">{{ wizardKindDescription() }}</p>
+                            <p class="text-xs text-text-tertiary">Tipologia selezionata: {{
+                                proposalTypeLabel(wizard().proposalType) }}.</p>
+                        </div>
+                        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+                            Note trattativa
+                            <textarea class="input mt-1" title="Note" rows="5" [ngModel]="wizard().notes"
+                                (ngModelChange)="setWizardNotes($event)"></textarea>
+                        </label>
+                    </div>
+                    <div class="card p-5 space-y-4 bg-surface-inset border border-border/60 shadow-none">
+                        <div>
+                            <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary">Checklist regolamento</p>
+                            <h3 class="font-display text-xl font-bold mt-1">Prima di iniziare</h3>
+                        </div>
+                        <ul class="space-y-3 text-sm text-text-secondary">
+                            <li class="rounded-2xl border border-border bg-surface px-4 py-3">La proposta deve contenere
+                                almeno un giocatore.</li>
+                            <li class="rounded-2xl border border-border bg-surface px-4 py-3">Solo la ratifica admin
+                                aggiorna rose e bilancio.</li>
+                            <li class="rounded-2xl border border-border bg-surface px-4 py-3">Ogni tipologia cambia lati
+                                selezionabili e dettagli del conguaglio.</li>
+                        </ul>
+                    </div>
+                </div>
+                }
+
+                @if (isWizardPageActive('counterparty')) {
+                <div class="grid xl:grid-cols-[0.9fr_1.1fr] gap-4">
+                    <div class="space-y-4">
+                        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+                            Controparte
+                            <select class="input mt-1" title="Controparte" [ngModel]="wizard().counterpartyId"
+                                (ngModelChange)="onCounterpartyChange($event)">
+                                <option value="">—</option>
+                                @for (t of selectableCounterparties(); track t.id) { <option [value]="t.id">{{ t.name }}
+                                </option> }
+                            </select>
+                        </label>
+                        <div class="rounded-2xl border border-border bg-surface-inset p-4">
+                            <p class="text-xs uppercase tracking-wide text-text-tertiary">Guida step</p>
+                            <p class="text-sm text-text-secondary mt-2">Scegli una squadra attiva di Lega. Appena
+                                selezionata, nel passo successivo vedrai la sua rosa con stipendio, durata contrattuale,
+                                anni residui e stato del contratto.</p>
+                        </div>
+                    </div>
+                    <div
+                        class="rounded-3xl border border-border bg-surface-inset p-5 min-h-56 flex flex-col justify-center">
+                        @if (selectedCounterparty()) {
+                        <p class="text-xs uppercase tracking-wide text-text-tertiary">Controparte selezionata</p>
+                        <h3 class="font-display text-3xl font-bold mt-2">{{ selectedCounterparty()?.name }}</h3>
+                        <p class="text-sm text-text-secondary mt-3">La proposta verra' inviata a questa societa'. Nel
+                            prossimo step potrai consultare la sua rosa completa e selezionare i giocatori coinvolti.
+                        </p>
+                        } @else {
+                        <p class="text-sm text-text-secondary">Seleziona una controparte per sbloccare il passo
+                            successivo del wizard.</p>
+                        }
+                    </div>
+                </div>
+                }
+
+                @if (isWizardPageActive('players')) {
+                <div class="grid gap-4" [class.xl:grid-cols-2]="shouldShowDirectionSection('from_proposer')">
+                    @if (shouldShowDirectionSection('from_proposer')) {
+                    <section class="card p-4 bg-surface-inset border border-border/60 shadow-none">
+                        <h3 class="font-display text-xl font-bold">{{ rosterColumnTitle('from_proposer') }}</h3>
+                        <p class="text-xs text-text-tertiary mt-1 mb-3">{{ rosterColumnHint('from_proposer') }}</p>
+                        <div class="divide-y divide-border max-h-96 overflow-y-auto">
+                            @for (p of myRoster(); track p.id) {
+                            <div class="flex items-center justify-between gap-3 py-2">
+                                <span><span class="font-medium">{{ p.name }}</span> <span
+                                        class="text-text-tertiary text-xs">({{ p.role }} · {{ p.fascia }})</span></span>
+                                <button class="btn btn-sm" [class.btn-primary]="!isInWizard(p.id)"
+                                    [class.btn-ghost]="isInWizard(p.id)"
+                                    (click)="toggleWizardItem(p, 'from_proposer')">{{ isInWizard(p.id) ? 'Rimuovi' :
+                                    directionActionLabel('from_proposer') }}</button>
+                            </div>
+                            } @empty {
+                            <p class="text-text-tertiary text-sm py-3">Rosa vuota.</p>
+                            }
+                        </div>
+                    </section>
+                    }
+
+                    <section class="card p-4 bg-surface-inset border border-border/60 shadow-none">
+                        <h3 class="font-display text-xl font-bold">{{ rosterColumnTitle('from_counterparty') }}</h3>
+                        <p class="text-xs text-text-tertiary mt-1 mb-3">{{ rosterColumnHint('from_counterparty') }}</p>
+                        @if (!isCounterpartySelected()) {
+                        <div
+                            class="rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text-secondary mb-3">
+                            Seleziona una controparte per visualizzare la sua rosa completa e costruire la proposta.
+                        </div>
+                        }
+                        <div class="divide-y divide-border max-h-96 overflow-y-auto">
+                            @for (p of counterpartyRoster(); track p.id) {
+                            <div class="grid md:grid-cols-[1.2fr_1fr_auto] gap-3 py-3 items-center">
+                                <div>
+                                    <p><span class="font-medium">{{ p.name }}</span> <span
+                                            class="text-text-tertiary text-xs">({{ p.role }} · {{ p.fascia }})</span>
+                                    </p>
+                                    <p class="text-xs text-text-secondary mt-1">Stipendio {{ p.salary | number:'1.0-2'
+                                        }} · Contratto {{ p.contract_years_total }} anni · Residuo {{
+                                        p.contract_years_remaining }} · {{ playerContractStatus(p) }}</p>
+                                </div>
+                                <div class="text-xs text-text-tertiary">
+                                    <div>Valore {{ p.market_value | number:'1.0-2' }}</div>
+                                    <div>Acquisizione {{ ACQ_LABEL[p.acquisition_type] || p.acquisition_type }}</div>
+                                </div>
+                                @if (isDirectionSelectionEnabled('from_counterparty')) {
+                                <button class="btn btn-sm" [class.btn-primary]="!isInWizard(p.id)"
+                                    [class.btn-ghost]="isInWizard(p.id)"
+                                    (click)="toggleWizardItem(p, 'from_counterparty')">{{ isInWizard(p.id) ? 'Rimuovi' :
+                                    directionActionLabel('from_counterparty') }}</button>
+                                } @else {
+                                <span class="text-xs text-text-tertiary">Non previsto</span>
+                                }
+                            </div>
+                            } @empty {
+                            <p class="text-text-tertiary text-sm py-3">Seleziona prima una controparte.</p>
+                            }
+                        </div>
+                    </section>
+                </div>
+                }
+
+                @if (isWizardPageActive('conguaglio')) {
+                <div class="space-y-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs uppercase tracking-[0.24em] text-text-tertiary">Conguaglio</p>
+                            <h3 class="font-display text-2xl font-bold mt-1">{{ conguaglioConfig().title }}</h3>
+                        </div>
+                        <div class="rounded-2xl border border-border bg-surface-inset px-4 py-3 max-w-md">
+                            <p class="text-sm text-text-secondary">{{ conguaglioConfig().summary }}</p>
+                        </div>
+                    </div>
+                    <div class="grid xl:grid-cols-[1.2fr_0.8fr_0.8fr] gap-4">
+                        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+                            {{ conguaglioConfig().amountLabel }}
+                            <input class="input mt-1" title="Importo conguaglio" type="number" step="0.01"
+                                [ngModel]="wizard().cash" (ngModelChange)="setWizardCash($event)" />
+                            <span class="text-xs normal-case tracking-normal text-text-secondary mt-2">{{
+                                conguaglioConfig().amountHint }}</span>
+                        </label>
+                        @if (conguaglioConfig().showPaymentMode) {
+                        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+                            Modalita' di pagamento
+                            <select class="input mt-1" title="Modalita pagamento" [ngModel]="wizard().paymentMode"
+                                (ngModelChange)="setPaymentMode($event)">
+                                <option value="immediato">Immediato</option>
+                                <option value="dilazionato">Dilazionato</option>
+                            </select>
+                        </label>
+                        }
+                        @if (conguaglioConfig().showContractDestination) {
+                        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+                            Destinazione contrattuale
+                            <select class="input mt-1" title="Destinazione contrattuale"
+                                [ngModel]="wizard().contractDestination"
+                                (ngModelChange)="setContractDestination($event)">
+                                <option value="keep_current">Mantenimento contratto attuale</option>
+                                <option value="new_contract">Nuovo contratto</option>
+                            </select>
+                        </label>
+                        }
+                        @if (conguaglioConfig().showRedemptionPrice) {
+                        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary">
+                            {{ conguaglioConfig().redemptionLabel }}
+                            <input class="input mt-1" title="Prezzo riscatto" type="number" step="0.01"
+                                [ngModel]="wizard().redemptionPrice" (ngModelChange)="setRedemptionPrice($event)" />
+                            <span class="text-xs normal-case tracking-normal text-text-secondary mt-2">{{
+                                conguaglioConfig().redemptionHint }}</span>
+                        </label>
+                        }
+                    </div>
+                </div>
+                }
+
+                @if (isWizardPageActive('review')) {
+                <div class="space-y-5">
+
+                    @if (validateProposalDraft()) {
+                    <div class="alert alert-error">{{ validateProposalDraft() }}</div>
+                    }
+
+                    <div class="rounded-2xl border-2 border-green-200 bg-green-50 p-5">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-widest text-green-700">Resoconto finale
+                                </p>
+                                <p class="text-2xl font-bold mt-1">{{ proposalTypeLabel(wizard().proposalType) }}</p>
+                            </div>
+                            <span class="badge badge-success">Pronto per l'invio</span>
+                        </div>
+                        <p class="text-sm mt-2 opacity-70">Solo la ratifica admin aggiorna rose e bilancio. Controlla
+                            ogni dato prima di inviare.</p>
+                    </div>
+
+                    <div class="grid lg:grid-cols-2 gap-4">
+                        <div class="card p-5">
+                            <p class="text-xs font-bold uppercase tracking-widest mb-4">Operazione</p>
+                            <table class="w-full text-sm">
+                                <tbody>
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60 w-1/2">Formula</th>
+                                        <td class="py-2 font-semibold">{{ proposalTypeLabel(wizard().proposalType) }}
+                                        </td>
+                                    </tr>
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60">Controparte</th>
+                                        <td class="py-2 font-semibold">{{ selectedCounterparty()?.name || '—' }}</td>
+                                    </tr>
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60">Pagamento</th>
+                                        <td class="py-2 font-semibold">{{ paymentModeLabel(wizard().paymentMode) }}</td>
+                                    </tr>
+                                    @if (conguaglioConfig().showContractDestination) {
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60">Destinazione contratto
+                                        </th>
+                                        <td class="py-2 font-semibold">{{
+                                            contractDestinationLabel(wizard().contractDestination) }}</td>
+                                    </tr>
+                                    }
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60">Giocatori proponente</th>
+                                        <td class="py-2 font-semibold">{{ proposerItemsCount() }}</td>
+                                    </tr>
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60">Giocatori controparte
+                                        </th>
+                                        <td class="py-2 font-semibold">{{ counterpartyItemsCount() }}</td>
+                                    </tr>
+                                    @if (wizard().notes) {
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60 align-top">Note</th>
+                                        <td class="py-2">{{ wizard().notes }}</td>
+                                    </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="card p-5">
+                            <p class="text-xs font-bold uppercase tracking-widest mb-4">Economico</p>
+                            <table class="w-full text-sm">
+                                <tbody>
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60 w-1/2">{{
+                                            conguaglioConfig().amountLabel }}</th>
+                                        <td class="py-2 font-bold text-xl">{{ wizard().cash | number:'1.0-2' }}</td>
+                                    </tr>
+                                    @if (conguaglioConfig().showRedemptionPrice) {
+                                    <tr class="border-t border-border">
+                                        <th class="text-left py-2 pr-4 font-normal opacity-60">{{
+                                            conguaglioConfig().redemptionLabel }}</th>
+                                        <td class="py-2 font-bold text-lg">{{ wizard().redemptionPrice | number:'1.0-2'
+                                            }}</td>
+                                    </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            <p class="text-sm opacity-60 mt-4">{{ conguaglioConfig().summary }}</p>
+                        </div>
+                    </div>
+
+                    <div class="card p-5 overflow-x-auto">
+                        <p class="text-xs font-bold uppercase tracking-widest mb-4">Giocatori nella proposta</p>
+                        @if (wizard().items.length === 0) {
+                        <p class="text-sm opacity-60">Nessun giocatore aggiunto.</p>
+                        } @else {
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b-2 border-border">
+                                    <th class="text-left py-2 pr-4 font-semibold text-xs uppercase tracking-wide">
+                                        Giocatore</th>
+                                    <th class="text-left py-2 pr-4 font-semibold text-xs uppercase tracking-wide">Lato
+                                    </th>
+                                    <th class="text-left py-2 pr-4 font-semibold text-xs uppercase tracking-wide">
+                                        Formula</th>
+                                    <th class="text-right py-2 pr-2 font-semibold text-xs uppercase tracking-wide">Anni
+                                    </th>
+                                    <th class="text-right py-2 pr-2 font-semibold text-xs uppercase tracking-wide">
+                                        Stipendio</th>
+                                    <th class="text-right py-2 font-semibold text-xs uppercase tracking-wide">Valore mkt
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (it of wizard().items; track it.player_id) {
+                                <tr class="border-t border-border">
+                                    <td class="py-2 pr-4 font-medium">{{ it.player_name }}<span
+                                            class="font-normal opacity-50"> {{ it.player_role }}</span></td>
+                                    <td class="py-2 pr-4">
+                                        <span
+                                            [class]="it.direction === 'from_proposer' ? 'badge badge-warning' : 'badge badge-info'">
+                                            {{ it.direction === 'from_proposer' ? 'Proponente' : 'Controparte' }}
+                                        </span>
+                                    </td>
+                                    <td class="py-2 pr-4"><span class="badge badge-neutral mercato-formula-badge">{{
+                                            formulaLabel(it) }}</span></td>
+                                    <td class="py-2 pr-2 text-right"><input class="input text-right w-20" title="Anni"
+                                            type="number" [ngModel]="it.contract_years_after"
+                                            (ngModelChange)="updateWizardItem(it.player_id, { contract_years_after: +$event })" />
+                                    </td>
+                                    <td class="py-2 pr-2 text-right"><input class="input text-right w-24"
+                                            title="Stipendio" type="number" [ngModel]="it.salary_after"
+                                            (ngModelChange)="updateWizardItem(it.player_id, { salary_after: +$event })" />
+                                    </td>
+                                    <td class="py-2 text-right"><input class="input text-right w-24" title="Valore"
+                                            type="number" [ngModel]="it.market_value_after"
+                                            (ngModelChange)="updateWizardItem(it.player_id, { market_value_after: +$event })" />
+                                    </td>
+                                </tr>
+                                }
+                            </tbody>
+                        </table>
+                        }
+                    </div>
+
+                </div>
+                }
+            </section>
+
+            <div class="flex flex-wrap justify-between gap-2">
+                <div class="flex gap-2">
+                    <button class="btn btn-ghost" (click)="resetWizard()">Reset</button>
+                    @if (hasPreviousWizardPage()) {
+                    <button class="btn btn-ghost" (click)="previousWizardPage()">Indietro</button>
+                    }
+                </div>
+                <div class="flex gap-2">
+                    @if (hasNextWizardPage()) {
+                    <button class="btn btn-primary" (click)="nextWizardPage()">Continua</button>
+                    } @else {
+                    <button class="btn btn-primary" [disabled]="!canSubmitProposal()" (click)="submitWizard()">{{
+                        wizardSubmitting() ? 'Invio…' : 'Invia proposta alla controparte' }}</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+    }
+    }
+</div>

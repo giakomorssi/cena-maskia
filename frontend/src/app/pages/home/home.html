@@ -1,0 +1,274 @@
+<!-- Hero full-bleed -->
+<section class="hero-pitch">
+    <div class="relative max-w-6xl mx-auto px-6 lg:px-10 py-12 md:py-20">
+        @if (!isTeamView() && !isAdminView()) {
+        <div class="max-w-md mx-auto text-center">
+            <div class="flex items-center justify-center gap-2 mb-6">
+                <span class="badge badge-gold">&#9733; Mantra · Stagione {{ currentSeason()?.name ?? '&#8212;' }}</span>
+            </div>
+            <h1 class="font-display text-4xl md:text-5xl font-extrabold tracking-tight leading-[1.05]">
+                Accedi alla tua <span class="text-gold-bright">squadra</span>.
+            </h1>
+            <p class="mt-4 text-white/70 text-base">
+                Seleziona il tipo di accesso per entrare nell'area riservata.
+            </p>
+            <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                <a routerLink="/profilo-squadra" class="btn btn-gold text-base px-6 py-3">Accedi come squadra</a>
+                <a routerLink="/admin" class="btn bg-white-soft text-base px-6 py-3">Accedi come admin</a>
+            </div>
+        </div>
+        } @else if (isTeamView()) {
+        <div class="flex items-center gap-2 mb-4">
+            <span class="badge badge-gold">★ Mantra · Stagione {{ currentSeason()?.name ?? '—' }}</span>
+        </div>
+        <h1 class="font-display text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.05]">
+            Bentornato, <span class="text-gold-bright">{{ teamSession.team()?.name }}</span>.
+        </h1>
+        <p class="mt-4 max-w-xl text-white/80 text-base md:text-lg">
+            Qui vedi solo il profilo e i dati operativi della tua squadra: bilancio, stato e aggiornamenti della lega.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+            <a routerLink="/bilanci" class="btn btn-gold">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                    <path d="M12 4v16m8-8H4" stroke-linecap="round" />
+                </svg>
+                Carica il tuo bilancio
+            </a>
+            <a routerLink="/profilo-squadra" class="btn bg-white-soft">
+                Aggiorna il profilo
+            </a>
+        </div>
+        } @else {
+        <div class="flex items-center gap-2 mb-4">
+            <span class="badge badge-gold">★ Mantra · Stagione {{ currentSeason()?.name ?? '—' }}</span>
+        </div>
+        <h1 class="font-display text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.05]">
+            Pannello di <span class="text-gold-bright">gestione</span> della lega.
+        </h1>
+        <p class="mt-4 max-w-xl text-white/80 text-base md:text-lg">
+            Controlla squadre, bilanci, stagioni e comunicazioni senza esporre contenuti operativi agli altri utenti.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+            <a routerLink="/admin" class="btn btn-gold">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                    <path d="M12 4v16m8-8H4" stroke-linecap="round" />
+                </svg>
+                Vai alla gestione
+            </a>
+            <a routerLink="/bilanci" class="btn bg-white-soft">
+                Controlla i bilanci
+            </a>
+        </div>
+        }
+    </div>
+</section>
+
+@if (isTeamView() || isAdminView()) {
+<div class="max-w-6xl mx-auto px-6 lg:px-10 py-10 space-y-10">
+    <!-- Team summary card -->
+    @if (isTeamView() && dashboard(); as d) {
+    <section class="card p-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div>
+            <p class="text-xs uppercase text-text-tertiary">Rosa</p>
+            <p class="font-display text-2xl font-bold">{{ d.roster_summary?.count ?? 0 }} giocatori</p>
+            <p class="text-xs text-text-tertiary">Monte ingaggi {{ d.roster_summary?.total_salary | number:'1.0-0' }}
+            </p>
+        </div>
+        <div>
+            <p class="text-xs uppercase text-text-tertiary">Bilancio</p>
+            @if (d.current_balance_status === 'submitted') {
+            <p class="font-display text-lg"><span class="badge badge-success">Inviato</span></p>
+            } @else if (d.current_balance_status === 'draft') {
+            <p class="font-display text-lg"><span class="badge badge-warning">In bozza</span></p>
+            } @else {
+            <p class="font-display text-lg"><span class="badge badge-neutral">Da compilare</span></p>
+            }
+            <a routerLink="/bilanci" class="text-xs text-pitch hover:underline">Vai a bilanci →</a>
+        </div>
+        <div>
+            <p class="text-xs uppercase text-text-tertiary">Mercato</p>
+            <p class="font-display text-2xl font-bold" [class.text-warning]="d.pending_incoming_trades > 0">
+                {{ d.pending_incoming_trades }} <span class="text-sm font-normal">in entrata</span>
+            </p>
+            <p class="text-xs text-text-tertiary">{{ d.pending_outgoing_trades }} in uscita</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase text-text-tertiary">Multe</p>
+            <p class="font-display text-2xl font-bold" [class.text-danger]="d.unpaid_fines_total > 0">{{
+                d.unpaid_fines_total | number:'1.0-2' }}</p>
+            <p class="text-xs text-text-tertiary">da pagare</p>
+        </div>
+    </section>
+    }
+
+    <!-- Admin overview -->
+    @if (isAdminView() && adminStatuses().length > 0) {
+    <section class="grid md:grid-cols-3 gap-3">
+        <div class="card p-4">
+            <p class="text-xs uppercase text-text-tertiary">Bilanci mancanti</p>
+            <p class="font-display text-3xl font-bold" [class.text-danger]="missingBalanceTeams().length > 0">{{
+                missingBalanceTeams().length }}</p>
+            <p class="text-xs text-text-tertiary">stagione corrente</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase text-text-tertiary">Bozze aperte</p>
+            <p class="font-display text-3xl font-bold" [class.text-warning]="draftBalanceTeams().length > 0">{{
+                draftBalanceTeams().length }}</p>
+            <p class="text-xs text-text-tertiary">in attesa di submit</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase text-text-tertiary">Squadre con multe</p>
+            <p class="font-display text-3xl font-bold" [class.text-danger]="teamsWithUnpaidFines().length > 0">{{
+                teamsWithUnpaidFines().length }}</p>
+            <p class="text-xs text-text-tertiary">non saldate</p>
+        </div>
+    </section>
+    }
+
+    <!-- Stat tiles -->
+    @if (!isTeamView()) {
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-tile stat-tile-accent">
+            <p class="stat-label">Squadre</p>
+            <p class="stat-value">{{ teamsCount() }}</p>
+            <p class="stat-hint">in lega</p>
+        </div>
+        <div class="stat-tile stat-tile-accent">
+            <p class="stat-label">Bilanci ricevuti</p>
+            <p class="stat-value">{{ canSeeBalances() ? balancesCount() : '—' }}<span
+                    class="text-lg text-text-tertiary">/{{ teamsCount() || '—'
+                    }}</span></p>
+            <p class="stat-hint">{{ canSeeBalances() ? 'stagione corrente' : 'visibile dopo accesso' }}</p>
+        </div>
+        <div class="stat-tile stat-tile-accent">
+            <p class="stat-label">Sanzioni attive</p>
+            <p class="stat-value" [class.text-danger]="sanctionsCount() > 0">{{ canSeeBalances() ? sanctionsCount() :
+                '—' }}</p>
+            <p class="stat-hint">{{ canSeeBalances() ? 'sui bilanci' : 'dato riservato' }}</p>
+        </div>
+        <div class="stat-tile stat-tile-accent">
+            <p class="stat-label">Stagione</p>
+            <p class="stat-value text-pitch-dark">{{ currentSeason()?.name ?? '—' }}</p>
+            <p class="stat-hint">in corso</p>
+        </div>
+    </section>
+    }
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- News -->
+        <section class="lg:col-span-2 card p-6">
+            <div class="flex items-center justify-between mb-5">
+                <h2 class="section-title">Ultime news</h2>
+                <a routerLink="/bacheca" class="text-xs font-medium text-pitch hover:underline">Vedi tutte →</a>
+            </div>
+            @if (news().length === 0) {
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6">
+                        <path d="M3 5h18v14H3zM7 9h10M7 13h6" stroke-linecap="round" />
+                    </svg>
+                </div>
+                <p class="text-sm">Nessuna news pubblicata ancora.</p>
+            </div>
+            } @else {
+            <div role="list" class="space-y-3">
+                @for (n of news(); track n.id) {
+                <div role="listitem" class="group flex gap-4 p-3 rounded-lg hover:bg-surface-inset transition-colors">
+                    <div class="avatar avatar-sm">
+                        @if (n.pinned) { ★ } @else { N }
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <p class="font-display font-semibold text-text truncate">{{ n.title }}</p>
+                            @if (n.pinned) { <span class="badge badge-gold">Pin</span> }
+                        </div>
+                        <p class="text-xs text-text-tertiary">
+                            {{ n.published_at | date:'dd MMM yyyy' }}
+                            @if (n.author) { · {{ n.author }} }
+                        </p>
+                    </div>
+                </div>
+                }
+            </div>
+            }
+        </section>
+
+        <!-- Sidebar widgets -->
+        <aside class="space-y-6">
+            <!-- Quick links -->
+            <section class="card p-6">
+                <h2 class="section-title mb-4">{{ isAdminView() ? 'Gestione rapida' : isTeamView() ? 'La tua squadra' :
+                    'Esplora' }}</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    @if (isAdminView()) {
+                    <a routerLink="/admin"
+                        class="card-hover flex flex-col gap-1 p-3 rounded-lg border border-border bg-surface-raised text-sm font-medium">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            class="w-5 h-5 text-pitch">
+                            <rect x="4" y="11" width="16" height="10" rx="2" />
+                            <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+                    <a routerLink="/bilanci"
+                        class="card-hover flex flex-col gap-1 p-3 rounded-lg border border-border bg-surface-raised text-sm font-medium">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            class="w-5 h-5 text-gold">
+                            <path d="M3 3v18h18M7 14l3-3 3 3 5-5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Bilanci</span>
+                    </a>
+                    } @else if (isTeamView()) {
+                    <a routerLink="/profilo-squadra"
+                        class="card-hover flex flex-col gap-1 p-3 rounded-lg border border-border bg-surface-raised text-sm font-medium">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            class="w-5 h-5 text-pitch">
+                            <path
+                                d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.4 0-8 2-8 4.5V21h16v-2.5C20 16 16.4 14 12 14z"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Profilo</span>
+                    </a>
+                    <a routerLink="/bilanci"
+                        class="card-hover flex flex-col gap-1 p-3 rounded-lg border border-border bg-surface-raised text-sm font-medium">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            class="w-5 h-5 text-gold">
+                            <path d="M3 3v18h18M7 14l3-3 3 3 5-5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Il tuo bilancio</span>
+                    </a>
+                    } @else {
+                    <a routerLink="/mercato"
+                        class="card-hover flex flex-col gap-1 p-3 rounded-lg border border-border bg-surface-raised text-sm font-medium">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            class="w-5 h-5 text-pitch">
+                            <path d="M4 7h16l-2 11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L4 7zm4 0V5a4 4 0 0 1 8 0v2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Mercato</span>
+                    </a>
+                    <a routerLink="/cassa"
+                        class="card-hover flex flex-col gap-1 p-3 rounded-lg border border-border bg-surface-raised text-sm font-medium">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            class="w-5 h-5 text-gold">
+                            <path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"
+                                stroke-linecap="round" />
+                        </svg>
+                        <span>Cassa</span>
+                    </a>
+                    <a routerLink="/albo-doro"
+                        class="card-hover flex flex-col gap-1 p-3 rounded-lg border border-border bg-surface-raised text-sm font-medium">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            class="w-5 h-5 text-gold-dark">
+                            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                        <span>Albo d'oro</span>
+                    </a>
+                    }
+                </div>
+            </section>
+        </aside>
+    </div>
+</div>
+}

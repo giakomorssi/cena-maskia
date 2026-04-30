@@ -1,0 +1,287 @@
+<div class="max-w-6xl mx-auto px-6 lg:px-10 py-10">
+    <header class="page-header">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-neutral">🔐 Riservato</span>
+        </div>
+        <h1 class="page-title">Pannello Admin</h1>
+        <p class="page-subtitle">Gestione stagioni, squadre e bilanci della lega.</p>
+    </header>
+
+    @if (!admin.isAdmin()) {
+    <!-- Login -->
+    <div class="grid lg:grid-cols-2 gap-8 items-center">
+        <div class="card-pop p-8 max-w-md">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 bg-brand-grad">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6 text-white">
+                    <rect x="4" y="11" width="16" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke-linecap="round" />
+                </svg>
+            </div>
+            <h2 class="font-display text-2xl font-bold mb-2">Accesso admin</h2>
+            <p class="text-sm text-text-secondary mb-6">Clicca per accedere all'area di gestione.</p>
+            @if (loginError()) {
+            <p class="text-sm text-danger mb-3">{{ loginError() }}</p>
+            }
+            <button (click)="login()" class="btn btn-primary w-full">Entra come Admin</button>
+        </div>
+        <aside class="hidden lg:block">
+            <div class="card p-6 bg-surface-inset/40">
+                <h3 class="section-title section-title-sm mb-3">Cosa puoi fare</h3>
+                <ul class="text-sm text-text-secondary space-y-2 list-disc pl-4">
+                    <li>Creare stagioni e squadre</li>
+                    <li>Verificare stato squadre e bilanci</li>
+                    <li>Aprire e modificare i bilanci admin</li>
+                </ul>
+            </div>
+        </aside>
+    </div>
+    } @else {
+    <!-- Admin status bar -->
+    <div class="card p-4 mb-6 flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-success-grad">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    class="w-5 h-5 text-white">
+                    <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+            <div>
+                <p class="font-semibold text-text">Sessione admin attiva</p>
+                <p class="text-xs text-text-secondary">Le tue azioni saranno autenticate.</p>
+            </div>
+        </div>
+        <button (click)="logout()" class="btn btn-ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>
+            Esci
+        </button>
+    </div>
+
+    @if (message(); as m) {
+    <div class="card p-4 mb-6 border-success/40 bg-success-soft animate-fade flex items-center gap-3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            class="w-5 h-5 text-success shrink-0">
+            <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <p class="text-sm font-medium text-pitch-dark">{{ m }}</p>
+    </div>
+    }
+
+    @if (uploadError()) {
+    <div class="card p-4 mb-6 border-danger/40 bg-danger/10 animate-fade flex items-center gap-3">
+        <p class="text-sm font-medium text-danger">{{ uploadError() }}</p>
+    </div>
+    }
+
+    <div class="grid md:grid-cols-2 gap-6">
+        <section class="card p-6 md:col-span-2">
+            <div class="flex items-start justify-between gap-4 mb-5 flex-wrap">
+                <div>
+                    <h2 class="section-title">Upload Excel lega</h2>
+                    <p class="text-sm text-text-secondary mt-1">Ogni caricamento sostituisce il file gia presente per
+                        rose, calendario o classifica.</p>
+                </div>
+            </div>
+            <div class="grid lg:grid-cols-3 gap-4">
+                @for (card of uploadCards; track card.kind) {
+                <div class="rounded-2xl border border-border bg-surface-inset/30 p-5">
+                    <p class="text-xs uppercase tracking-wider text-text-tertiary">Excel</p>
+                    <h3 class="section-title section-title-sm mt-2">{{ card.title }}</h3>
+                    <p class="text-sm text-text-secondary mt-2 min-h-12">{{ card.description }}</p>
+                    <label class="btn btn-primary mt-4 w-full justify-center"
+                        [class.opacity-60]="isUploading(card.kind)">
+                        <input type="file" class="hidden" accept=".xlsx,.xls" (change)="uploadAsset(card.kind, $event)"
+                            [disabled]="isUploading(card.kind)" />
+                        {{ isUploading(card.kind) ? 'Caricamento…' : card.actionLabel }}
+                    </label>
+                </div>
+                }
+            </div>
+        </section>
+
+        <section class="card p-6 md:col-span-2">
+            <div class="flex items-start justify-between gap-4 mb-5">
+                <div>
+                    <h2 class="section-title">Stato squadre</h2>
+                    <p class="text-sm text-text-secondary mt-1">Resoconto rapido per capire chi ha profilo e bilancio
+                        corrente in ordine.</p>
+                </div>
+                <div class="flex gap-3">
+                    <div class="stat-tile min-w-32">
+                        <p class="stat-label">OK</p>
+                        <p class="stat-value">{{ okTeamsCount() }}</p>
+                    </div>
+                    <div class="stat-tile min-w-32">
+                        <p class="stat-label">Con anomalie</p>
+                        <p class="stat-value" [class.text-danger]="anomalyTeamsCount() > 0">{{ anomalyTeamsCount() }}
+                        </p>
+                    </div>
+                    <div class="stat-tile min-w-32">
+                        <p class="stat-label">Da verificare</p>
+                        <p class="stat-value">{{ warningTeamsCount() }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-surface-inset text-text-secondary text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="text-left px-4 py-3">Squadra</th>
+                            <th class="text-left px-4 py-3">Profilo</th>
+                            <th class="text-left px-4 py-3">Bilancio corrente</th>
+                            <th class="text-left px-4 py-3">Ultima sanzione</th>
+                            <th class="text-left px-4 py-3">Anomalie</th>
+                            <th class="text-right px-4 py-3">Multe aperte</th>
+                            <th class="text-left px-4 py-3">Stato</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        @for (row of teamStatuses(); track row.team_id) {
+                        <tr>
+                            <td class="px-4 py-3">
+                                <div class="flex flex-col gap-0.5">
+                                    <span class="font-medium text-text">{{ row.team_name }}</span>
+                                    <span class="text-xs text-text-tertiary">{{ row.account_username }}</span>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                @if (row.profile_complete) {
+                                <span class="badge badge-success">Completo</span>
+                                } @else {
+                                <span class="badge badge-warning">Da completare</span>
+                                }
+                            </td>
+                            <td class="px-4 py-3">
+                                @if (row.has_uploaded_current_balance) {
+                                <span class="badge badge-success">Ricevuto</span>
+                                } @else {
+                                <span class="badge badge-warning">Mancante</span>
+                                }
+                            </td>
+                            <td class="px-4 py-3 text-text-secondary">
+                                {{ row.latest_sanction_level ?? '—' }}
+                                @if (row.latest_sanction_points !== null && row.latest_sanction_points !== undefined) {
+                                <span>· {{ row.latest_sanction_points }} pt</span>
+                                }
+                            </td>
+                            <td class="px-4 py-3">
+                                @if (row.anomalies.length) {
+                                <div class="flex flex-wrap gap-1.5">
+                                    @for (issue of row.anomalies; track issue.code) {
+                                    <span [class]="anomalyBadge(issue)">{{ issue.label }}</span>
+                                    }
+                                </div>
+                                } @else {
+                                <span class="text-text-tertiary text-xs">—</span>
+                                }
+                            </td>
+                            <td class="px-4 py-3 text-right tabular-nums">{{ row.unpaid_fines_total | number:'1.0-0' }}
+                            </td>
+                            <td class="px-4 py-3"><span [class]="statusBadge(row)">{{ row.is_ok ? 'OK' : 'Check'
+                                    }}</span></td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card p-6 md:col-span-2">
+            <div class="flex items-start justify-between gap-4 mb-5 flex-wrap">
+                <div>
+                    <h2 class="section-title">Resoconto bilanci</h2>
+                    <p class="text-sm text-text-secondary mt-1">Panoramica aggregata e stato generale dei bilanci della
+                        lega.</p>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <span class="text-xs font-semibold text-text-secondary uppercase tracking-wider">Stagione:</span>
+                    <button (click)="onBalanceSeasonChange('')" class="chip"
+                        [class.chip-active]="!balanceSeasonId()">Tutte</button>
+                    @for (season of seasons(); track season.id) {
+                    <button (click)="onBalanceSeasonChange(season.id)" class="chip"
+                        [class.chip-active]="balanceSeasonId() === season.id">{{ season.name }}</button>
+                    }
+                </div>
+            </div>
+
+            @if (balanceMessage()) {
+            <div class="alert alert-success mb-4">{{ balanceMessage() }}</div>
+            }
+            @if (balanceError()) {
+            <div class="alert alert-error mb-4">{{ balanceError() }}</div>
+            }
+
+            @if (balanceLoading()) {
+            <div class="card p-5 text-center text-text-secondary">Caricamento bilanci…</div>
+            } @else if (balances().length === 0) {
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6">
+                        <path d="M3 3v18h18M7 14l3-3 3 3 5-5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <p class="font-semibold text-text mb-1">Nessun bilancio</p>
+                <p class="text-sm">Non risultano bilanci per il filtro selezionato.</p>
+            </div>
+            } @else {
+            <div class="overflow-x-auto rounded-2xl border border-border">
+                <div class="grid md:grid-cols-3 gap-3 p-4 border-b border-border bg-surface-inset/30">
+                    <div class="stat-tile">
+                        <p class="stat-label">Consegnati</p>
+                        <p class="stat-value">{{ submittedBalancesCount() }}</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-label">In bozza</p>
+                        <p class="stat-value">{{ draftBalancesCount() }}</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-label">Utile totale lega</p>
+                        <p class="stat-value" [class.text-success]="totalLeagueResult() >= 0"
+                            [class.text-danger]="totalLeagueResult() < 0">{{ totalLeagueResult() | number:'1.2-2' }}</p>
+                    </div>
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="bg-surface-inset text-text-secondary text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="text-left px-4 py-3">Squadra</th>
+                            <th class="text-left px-4 py-3">Stagione</th>
+                            <th class="text-left px-4 py-3">Stato</th>
+                            <th class="text-right px-4 py-3">Ricavi</th>
+                            <th class="text-right px-4 py-3">Costi</th>
+                            <th class="text-right px-4 py-3">Ammort.</th>
+                            <th class="text-right px-4 py-3">Utile</th>
+                            <th class="text-left px-4 py-3">Sanzione</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        @for (balance of balances(); track balance.id) {
+                        <tr class="hover:bg-surface-inset/60 transition-colors">
+                            <td class="px-4 py-3 font-medium text-text">{{ teamName(balance.team_id) }}</td>
+                            <td class="px-4 py-3 text-text-secondary">{{ seasonName(balance.season_id) }}</td>
+                            <td class="px-4 py-3"><span [class]="balanceStatusBadgeClass(balance.status)">{{
+                                    balanceStatusLabel(balance.status) }}</span></td>
+                            <td class="px-4 py-3 text-right tabular-nums">{{ balance.total_ricavi | number:'1.2-2' }}
+                            </td>
+                            <td class="px-4 py-3 text-right tabular-nums">{{ balance.total_costi | number:'1.2-2' }}
+                            </td>
+                            <td class="px-4 py-3 text-right tabular-nums">{{ balance.total_ammortamenti | number:'1.2-2'
+                                }}</td>
+                            <td class="px-4 py-3 text-right font-semibold tabular-nums"
+                                [class.text-success]="balance.utile >= 0" [class.text-danger]="balance.utile < 0">{{
+                                balance.utile | number:'1.2-2' }}</td>
+                            <td class="px-4 py-3"><span [class]="sanctionClass(balance.sanction_level)">{{
+                                    sanctionLabel(balance.sanction_level) }} · {{ balance.sanction_points }} pt</span>
+                            </td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            }
+        </section>
+
+    </div>
+    }
+</div>

@@ -1,0 +1,181 @@
+<div class="max-w-6xl mx-auto px-6 lg:px-10 py-10">
+    <header class="page-header">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-gold">Squadra</span>
+            @if (session.isLoggedIn()) {
+            <span class="badge badge-success">Sessione attiva</span>
+            }
+        </div>
+        <h1 class="page-title">Economia squadra</h1>
+        <p class="page-subtitle">Stadio, sponsor, premi ottenuti e premi contabilizzati in una sezione unica dedicata.
+        </p>
+    </header>
+
+    @if (!session.isLoggedIn()) {
+    <div class="card-pop p-8 max-w-xl">
+        <h2 class="font-display text-2xl font-bold mb-2">Accesso squadra richiesto</h2>
+        <p class="text-sm text-text-secondary mb-5">Per vedere e modificare questa sezione devi entrare con il profilo
+            della tua squadra.</p>
+        <a routerLink="/profilo-squadra" class="btn btn-primary">Vai a profilo squadra</a>
+    </div>
+    } @else {
+    <div class="space-y-6 animate-fade">
+        @if (message()) {
+        <div class="card p-4 border-success/40 bg-success-soft text-pitch-dark text-sm font-medium">{{ message() }}
+        </div>
+        }
+
+        @if (error()) {
+        <div class="card p-4 border-danger/40 bg-danger/10 text-danger text-sm font-medium">{{ error() }}</div>
+        }
+
+        @if (guidedBalance(); as g) {
+        <div class="card-pop p-6 md:p-8 space-y-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h2 class="font-display text-2xl font-bold text-text">{{ dashboard()?.team?.name ?? 'Squadra' }}
+                        </h2>
+                        <span [class]="g.balance.status === 'draft' ? 'badge badge-warning' : 'badge badge-success'">
+                            {{ g.balance.status === 'draft' ? 'Bilancio in bozza' : 'Bilancio inviato' }}
+                        </span>
+                    </div>
+                    <p class="text-sm text-text-secondary mt-2">Stagione {{ dashboard()?.current_season?.name ??
+                        'corrente' }}. Qui puoi vedere la scelta stadio fatta, i ricavi collegati e i premi gia
+                        registrati.</p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-3">
+                <div class="stat-tile">
+                    <p class="stat-label">Capitale sociale</p>
+                    <p class="stat-value">{{ capitaleField()?.amount ?? 0 | number:'1.0-2' }}</p>
+                    <p class="stat-hint">Voce base stagionale</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Sponsor contabilizzati</p>
+                    <p class="stat-value">{{ sponsorField()?.amount ?? 0 | number:'1.0-2' }}</p>
+                    <p class="stat-hint">Importo attuale a bilancio</p>
+                </div>
+                <div class="stat-tile">
+                    <p class="stat-label">Premi contabilizzati</p>
+                    <p class="stat-value">{{ premiField()?.amount ?? 0 | number:'1.0-2' }}</p>
+                    <p class="stat-hint">Premi ottenuti o ancora aggiornabili</p>
+                </div>
+            </div>
+
+            <div class="grid lg:grid-cols-[1.2fr_0.8fr] gap-4">
+                <div class="rounded-2xl border border-border p-4 bg-surface-inset/30">
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-text-tertiary">Stadio</p>
+                            <h3 class="font-display text-xl font-bold text-text mt-1">{{ selectedStadium()?.name ??
+                                'Nessuno stadio selezionato' }}</h3>
+                            <p class="text-sm text-text-secondary mt-1">{{ selectedStadium()?.description ?? 'Seleziona
+                                uno stadio per vedere costi e ricavi automatici.' }}</p>
+                        </div>
+                        @if (selectedStadium(); as stadium) {
+                        <span class="badge badge-neutral">{{ stadium.city }}</span>
+                        }
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-3 mb-4">
+                        <div class="rounded-xl border border-border bg-white/60 p-3">
+                            <p class="text-xs uppercase tracking-wider text-text-tertiary">Ricavi stadio ottenuti finora
+                            </p>
+                            <p class="text-lg font-semibold text-text mt-1">{{ selectedStadium()?.revenue ?? 0 |
+                                number:'1.0-2' }}</p>
+                            <p class="text-xs text-text-tertiary mt-1">Voce automatica ricavi della scelta attuale</p>
+                        </div>
+                        <div class="rounded-xl border border-border bg-white/60 p-3">
+                            <p class="text-xs uppercase tracking-wider text-text-tertiary">Costi stadio attuali</p>
+                            <p class="text-lg font-semibold text-text mt-1">{{ selectedStadium()?.cost ?? 0 |
+                                number:'1.0-2' }}</p>
+                            <p class="text-xs text-text-tertiary mt-1">Costo annuale della struttura selezionata</p>
+                        </div>
+                    </div>
+
+                    @if (canEditEconomy()) {
+                    <div>
+                        <label class="input-label" for="stadium-select">Modifica scelta stadio</label>
+                        <select id="stadium-select" title="Modifica scelta stadio" class="select"
+                            [value]="selectedStadiumId()" (change)="selectStadium($any($event.target).value)">
+                            <option value="">Seleziona stadio</option>
+                            @for (stadium of stadiums(); track stadium.id) {
+                            <option [value]="stadium.id">{{ stadium.name }} · Ricavi {{ stadium.revenue | number:'1.0-2'
+                                }} · Costi {{ stadium.cost | number:'1.0-2' }}</option>
+                            }
+                        </select>
+                        <p class="text-xs text-text-tertiary mt-2">La scelta resta modificabile finche il bilancio della
+                            stagione e in bozza.</p>
+                    </div>
+                    } @else {
+                    <p class="text-xs text-text-tertiary">La scelta stadio e bloccata perche il bilancio corrente e gia
+                        stato inviato.</p>
+                    }
+                </div>
+
+                <div class="rounded-2xl border border-border p-4 bg-surface-inset/30 space-y-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider text-text-tertiary">Ricavi di lega</p>
+                        <h3 class="font-display text-xl font-bold text-text mt-1">Sponsor e premi</h3>
+                        <p class="text-sm text-text-secondary mt-1">Gli importi qui sotto rappresentano i valori oggi
+                            presenti nella bozza o nel bilancio inviato.</p>
+                    </div>
+
+                    <div>
+                        <label class="input-label" for="sponsor-input">Sponsor</label>
+                        <input id="sponsor-input" title="Sponsor" placeholder="Importo sponsor" class="input"
+                            type="number" step="0.01" [value]="sponsorField()?.amount ?? 0"
+                            (input)="updateGuidedAmount('sponsor', $any($event.target).value)"
+                            [disabled]="!canEditEconomy()" />
+                    </div>
+
+                    <div>
+                        <label class="input-label" for="premi-input">Premi</label>
+                        <input id="premi-input" title="Premi" placeholder="Importo premi" class="input" type="number"
+                            step="0.01" [value]="premiField()?.amount ?? 0"
+                            (input)="updateGuidedAmount('premi', $any($event.target).value)"
+                            [disabled]="!canEditEconomy()" />
+                    </div>
+
+                    <div class="rounded-xl border border-border bg-white/60 p-3">
+                        <p class="text-xs uppercase tracking-wider text-text-tertiary">Premi ottenuti</p>
+                        @if (orderedHonors().length) {
+                        <div class="mt-2 space-y-2">
+                            @for (honor of orderedHonors(); track honor.id) {
+                            <div class="flex items-start justify-between gap-3 text-sm">
+                                <div>
+                                    <p class="font-medium text-text">{{ honor.trophy }}</p>
+                                    <p class="text-xs text-text-tertiary">Stagione {{ honor.season_id }}@if
+                                        (honor.notes) { · {{ honor.notes }} }</p>
+                                </div>
+                                @if (honor.position !== null && honor.position !== undefined) {
+                                <span class="badge badge-neutral">#{{ honor.position }}</span>
+                                }
+                            </div>
+                            }
+                        </div>
+                        } @else {
+                        <p class="text-sm text-text-tertiary mt-2">Nessun premio ufficiale registrato finora.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 flex-wrap">
+                <button class="btn btn-primary" [disabled]="!canEditEconomy() || saving()" (click)="saveEconomyArea()">
+                    {{ saving() ? 'Salvataggio…' : 'Salva area economica' }}
+                </button>
+                @if (!canEditEconomy()) {
+                <p class="text-xs text-text-tertiary">Per modificare di nuovo stadio, sponsor o premi serve una
+                    riapertura della bozza nel bilancio.</p>
+                }
+            </div>
+        </div>
+        } @else {
+        <div class="card p-6 text-sm text-text-secondary">Area economica non disponibile per la stagione corrente.</div>
+        }
+    </div>
+    }
+</div>

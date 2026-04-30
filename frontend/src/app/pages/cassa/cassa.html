@@ -1,0 +1,121 @@
+<div class="max-w-5xl mx-auto px-6 lg:px-10 py-10 space-y-6">
+    <header class="page-header">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-gold">💰 Cassa</span>
+        </div>
+        <h1 class="page-title">Cassa comune</h1>
+        <p class="page-subtitle">Vista riservata agli admin: incassi, multe per squadra e andamento mensile.</p>
+    </header>
+
+    @if (!admin.isAdmin()) {
+    <div class="card p-6 border-warning/30 bg-warning-soft flex items-start gap-4">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            class="w-6 h-6 text-warning shrink-0 mt-0.5">
+            <path
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <div>
+            <p class="font-semibold text-warning">Accesso riservato</p>
+            <p class="text-sm text-warning/80 mt-1">La cassa comune è visibile solo agli admin. Le squadre vedono le
+                proprie multe nel <a routerLink="/profilo-squadra" class="underline font-semibold">profilo squadra</a>.
+            </p>
+        </div>
+    </div>
+    } @else {
+
+    <div class="flex flex-wrap gap-2 items-center">
+        <span class="text-xs font-semibold text-text-secondary uppercase tracking-wider mr-1">Stagione:</span>
+        <button (click)="onSeasonChange('')" class="chip" [class.chip-active]="!selectedSeason()">Tutte</button>
+        @for (s of seasons(); track s.id) {
+        <button (click)="onSeasonChange(s.id)" class="chip" [class.chip-active]="selectedSeason()===s.id">{{ s.name
+            }}</button>
+        }
+        <button class="btn btn-ghost ml-auto" (click)="refresh()">Aggiorna</button>
+    </div>
+
+    @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
+    @if (loading()) { <div class="card p-6 text-center text-text-secondary">Caricamento…</div> }
+
+    @if (summary(); as sum) {
+    <div class="grid sm:grid-cols-4 gap-3">
+        <div class="stat-tile">
+            <p class="stat-label">Totale</p>
+            <p class="stat-value">{{ sum.total | number:'1.0-2' }}</p>
+            <p class="stat-hint">{{ sum.count }} multe</p>
+        </div>
+        <div class="stat-tile">
+            <p class="stat-label">Pagate</p>
+            <p class="stat-value text-success">{{ sum.paid | number:'1.0-2' }}</p>
+        </div>
+        <div class="stat-tile">
+            <p class="stat-label">Da incassare</p>
+            <p class="stat-value text-danger">{{ sum.unpaid | number:'1.0-2' }}</p>
+        </div>
+        <div class="stat-tile">
+            <p class="stat-label">Squadre coinvolte</p>
+            <p class="stat-value">{{ sum.rows.length }}</p>
+        </div>
+    </div>
+
+    <div class="card p-5">
+        <h3 class="section-title section-title-sm mb-3">Andamento mensile</h3>
+        @if (sum.by_month.length === 0) {
+        <p class="text-text-tertiary text-sm">Nessun dato.</p>
+        } @else {
+        <div class="space-y-2">
+            @for (m of sum.by_month; track m.month) {
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-text-tertiary w-20 tabular-nums">{{ m.month }}</span>
+                <div class="flex-1 bg-surface-inset rounded-full h-3 overflow-hidden">
+                    <div class="h-full bg-pitch-bar" [style.width.%]="barWidth(m.total)"></div>
+                </div>
+                <span class="text-xs font-semibold tabular-nums w-24 text-right">{{ m.total | number:'1.0-2' }} ({{
+                    m.count }})</span>
+            </div>
+            }
+        </div>
+        }
+    </div>
+
+    <div class="card overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-surface-inset text-text-tertiary text-xs uppercase tracking-wider">
+                <tr>
+                    <th class="text-left px-5 py-3">Squadra</th>
+                    <th class="text-right px-5 py-3"># Multe</th>
+                    <th class="text-right px-5 py-3">Totale</th>
+                    <th class="text-right px-5 py-3">Pagato</th>
+                    <th class="text-right px-5 py-3">Da pagare</th>
+                    <th class="text-left px-5 py-3 w-1/4">% pagato</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                @for (r of sum.rows; track r.team_id) {
+                <tr class="hover:bg-surface-inset/60 transition-colors">
+                    <td class="px-5 py-3 font-medium">{{ r.team_name }}</td>
+                    <td class="px-5 py-3 text-right tabular-nums">{{ r.count }}</td>
+                    <td class="px-5 py-3 text-right tabular-nums font-semibold">{{ r.total | number:'1.0-2' }}</td>
+                    <td class="px-5 py-3 text-right tabular-nums text-success">{{ r.paid | number:'1.0-2' }}</td>
+                    <td class="px-5 py-3 text-right tabular-nums" [class.text-danger]="r.unpaid>0">{{ r.unpaid |
+                        number:'1.0-2' }}</td>
+                    <td class="px-5 py-3">
+                        <div class="bg-surface-inset rounded-full h-2 overflow-hidden">
+                            <div class="h-full bg-pitch-bar" [style.width.%]="r.total ? (r.paid / r.total * 100) : 0">
+                            </div>
+                        </div>
+                        <p class="text-[11px] text-text-tertiary mt-1">{{ r.total ? ((r.paid / r.total * 100) |
+                            number:'1.0-0') : 0 }}%</p>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="6" class="px-5 py-6 text-center text-text-tertiary">Nessuna multa registrata.</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+    }
+</div>

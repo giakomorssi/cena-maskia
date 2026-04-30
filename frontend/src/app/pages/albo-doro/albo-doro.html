@@ -1,0 +1,60 @@
+<div class="max-w-5xl mx-auto px-6 lg:px-10 py-10">
+    <header class="page-header">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-gold">🏆 Hall of Fame</span>
+        </div>
+        <h1 class="page-title">Albo d'oro</h1>
+        <p class="page-subtitle">I trofei e i piazzamenti delle stagioni passate.</p>
+    </header>
+
+    @if (groupedBySeason().length === 0) {
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6">
+                <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </div>
+        <p class="font-semibold text-text mb-1">Bacheca vuota</p>
+        <p class="text-sm">Nessun trofeo registrato. La storia inizia ora!</p>
+    </div>
+    } @else {
+    <div class="space-y-6">
+        @for (group of groupedBySeason(); track group[0]; let idx = $index) {
+        <section class="card overflow-hidden">
+            <header class="px-6 py-4 flex items-center justify-between bg-tile-gold-strip">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-gold-grad">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            class="w-5 h-5 text-white">
+                            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                    </div>
+                    <h2 class="font-display text-xl font-bold text-text">{{ group[0] }}</h2>
+                </div>
+                @if (idx === 0) {
+                <span class="badge badge-gold">Stagione recente</span>
+                }
+            </header>
+            <div role="list" class="divide-y divide-border">
+                @for (h of group[1]; track h.id) {
+                <div role="listitem"
+                    class="flex items-center gap-4 px-6 py-4 hover:bg-surface-inset/60 transition-colors">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center font-display font-bold text-sm shrink-0"
+                        [class.podium-1]="h.position === 1" [class.podium-2]="h.position === 2"
+                        [class.podium-3]="h.position === 3" [class.podium-other]="!h.position || h.position > 3">
+                        {{ h.position ? (h.position + '°') : '★' }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-display font-semibold text-text">{{ h.trophy }}</p>
+                        <p class="text-sm text-text-secondary">{{ teamName(h.team_id) }}</p>
+                        @if (h.notes) { <p class="text-xs text-text-tertiary mt-0.5">{{ h.notes }}</p> }
+                    </div>
+                </div>
+                }
+            </div>
+        </section>
+        }
+    </div>
+    }
+</div>
