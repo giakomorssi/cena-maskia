@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CENA MASKIA CHAMPIONSHIP
 
 Applicazione web full-stack per la gestione di una lega privata di Fantacalcio Mantra.
@@ -125,3 +126,6 @@ ANTHROPIC_API_KEY=sk-...   # Per il chatbot BAML
 ## License
 
 MIT
+=======
+# cena-maskia
+>>>>>>> fae516da5613ee6b73f2cf3eb9706aa7a6d4c173
