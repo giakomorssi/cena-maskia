@@ -3,7 +3,10 @@ set -e
 
 # Substitute only ${API_URL} in the nginx template, leave all other nginx
 # variables ($host, $http_upgrade, $uri, etc.) untouched.
-envsubst '${API_URL}' < /etc/nginx/templates/default.conf.template \
+# Set default port if not provided by Railway
+export PORT=${PORT:-80}
+
+envsubst '${API_URL} ${PORT}' < /etc/nginx/templates/default.conf.template \
     > /etc/nginx/conf.d/default.conf
 
 exec "$@"
