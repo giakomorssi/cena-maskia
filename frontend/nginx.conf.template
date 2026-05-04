@@ -4,6 +4,9 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Re-resolve upstream hostname every 10s (Railway assigns new IPs on redeploy)
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
     # Gzip compression
     gzip on;
     gzip_vary on;
@@ -19,11 +22,11 @@ server {
     }
 
     # API proxy to backend
-    # API_URL is injected at container start via envsubst
-    # Docker Compose default: http://api:8000
-    # Railway: https://<api-service>.railway.app
+    # Using a variable forces nginx to re-resolve the hostname dynamically
+    # instead of caching the IP at startup (critical for Railway redeployments)
     location /api/ {
-        proxy_pass http://cena-maskia.railway.internal:8080/api/;
+        set $api_upstream http://cena-maskia.railway.internal:8080;
+        proxy_pass $api_upstream/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
