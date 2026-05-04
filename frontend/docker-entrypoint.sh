@@ -1,12 +1,14 @@
 #!/bin/sh
 set -e
 
-# Substitute only ${API_URL} in the nginx template, leave all other nginx
-# variables ($host, $http_upgrade, $uri, etc.) untouched.
+# Get the DNS resolver from the system (works on Railway, Docker, etc.)
+DNS_RESOLVER=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
+export DNS_RESOLVER=${DNS_RESOLVER:-8.8.8.8}
+
 # Set default port if not provided by Railway
 export PORT=${PORT:-80}
 
-envsubst '${PORT}' < /etc/nginx/templates/default.conf.template \
+envsubst '${PORT} ${DNS_RESOLVER}' < /etc/nginx/templates/default.conf.template \
     > /etc/nginx/conf.d/default.conf
 
 exec "$@"

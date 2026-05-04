@@ -4,8 +4,9 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Re-resolve upstream hostname every 10s (Railway assigns new IPs on redeploy)
-    resolver 127.0.0.11 valid=10s ipv6=off;
+    # Re-resolve upstream hostname on every request (Railway assigns new IPs on redeploy)
+    # DNS_RESOLVER is injected at container start from /etc/resolv.conf
+    resolver ${DNS_RESOLVER} valid=10s ipv6=off;
 
     # Gzip compression
     gzip on;
