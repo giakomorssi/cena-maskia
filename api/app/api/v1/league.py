@@ -225,7 +225,23 @@ def _import_rose_to_db(db: Session, content: bytes) -> int:
             select(Team).where(Team.name == team_data["team_name"])
         ).scalar_one_or_none()
         if not team:
-            continue
+            slug = _slugify_username(team_data["team_name"])
+            # Ensure username uniqueness
+            base_slug = slug
+            counter = 1
+            while db.execute(
+                select(Team).where(Team.account_username == slug)
+            ).scalar_one_or_none():
+                slug = f"{base_slug}_{counter}"
+                counter += 1
+            team = Team(
+                name=team_data["team_name"],
+                account_username=slug,
+                password_hash=get_password_hash("utente"),
+                is_active=True,
+            )
+            db.add(team)
+            db.flush()
         db.execute(
             sa_delete(Player).where(
                 Player.team_id == team.id,
