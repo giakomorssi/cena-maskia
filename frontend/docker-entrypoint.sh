@@ -1,9 +1,16 @@
 #!/bin/sh
 set -e
 
-# Get the first IPv4 DNS resolver from the system (IPv6 breaks nginx resolver syntax)
-DNS_RESOLVER=$(awk '/^nameserver/ && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $2; exit}' /etc/resolv.conf)
-export DNS_RESOLVER=${DNS_RESOLVER:-8.8.8.8}
+# Get DNS resolver from /etc/resolv.conf.
+# nginx requires IPv6 addresses wrapped in brackets: [addr]
+# Try IPv4 first; if none found, use the first nameserver (IPv6) with brackets.
+IPV4_DNS=$(awk '/^nameserver/ && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $2; exit}' /etc/resolv.conf)
+if [ -n "$IPV4_DNS" ]; then
+    export DNS_RESOLVER="$IPV4_DNS"
+else
+    RAW_DNS=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
+    export DNS_RESOLVER="[${RAW_DNS}]"
+fi
 
 # Set default port if not provided by Railway
 export PORT=${PORT:-80}
