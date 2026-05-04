@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import lru_cache
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from openpyxl import load_workbook
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 
 @dataclass(frozen=True)
@@ -46,20 +48,92 @@ class LeagueCalendarData:
     rounds: list[ScheduleRound]
 
 
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+# ---------------------------------------------------------------------------
+# DB-backed read (primary)
+# ---------------------------------------------------------------------------
 
 
-def _rose_dir() -> Path:
-    return _project_root() / "rose"
+def get_league_calendar_data_from_db(db: "Session") -> LeagueCalendarData:
+    """Read standings and calendar from the database."""
+    from sqlalchemy import select
+    from app.models.league import CalendarRound, Season
+    from app.models.league import StandingRow as StandingRowModel
+
+    current_season = db.execute(
+        select(Season).where(Season.is_current.is_(True))
+    ).scalar_one_or_none()
+
+    standings: list[StandingRow] = []
+    rounds: list[ScheduleRound] = []
+    title = "Calendario"
+
+    if current_season:
+        title = f"Stagione {current_season.name}"
+
+        db_standings = (
+            db.execute(
+                select(StandingRowModel)
+                .where(StandingRowModel.season_id == current_season.id)
+                .order_by(StandingRowModel.position)
+            )
+            .scalars()
+            .all()
+        )
+
+        standings = [
+            StandingRow(
+                position=r.position,
+                team=r.team_name,
+                played=r.played,
+                wins=r.wins,
+                draws=r.draws,
+                losses=r.losses,
+                goals_for=r.goals_for,
+                goals_against=r.goals_against,
+                goal_diff=r.goal_diff,
+                points=r.points,
+                total_points=r.total_points,
+            )
+            for r in db_standings
+        ]
+
+        db_rounds = (
+            db.execute(
+                select(CalendarRound)
+                .where(CalendarRound.season_id == current_season.id)
+                .order_by(CalendarRound.league_round)
+            )
+            .scalars()
+            .all()
+        )
+
+        for rnd in db_rounds:
+            matches = [
+                ScheduleMatch(
+                    home_team=m.home_team,
+                    home_score=m.home_score,
+                    away_score=m.away_score,
+                    away_team=m.away_team,
+                    result=m.result,
+                )
+                for m in sorted(rnd.matches, key=lambda x: x.match_order)
+            ]
+            rounds.append(
+                ScheduleRound(
+                    league_round=rnd.league_round,
+                    serie_a_round=rnd.serie_a_round,
+                    matches=matches,
+                )
+            )
+
+    return LeagueCalendarData(
+        title=title, source_url=None, standings=standings, rounds=rounds
+    )
 
 
-def _calendar_file() -> Path:
-    return _rose_dir() / "Calendario_BUTTERATA-4SEASON-LEAGUE.xlsx"
-
-
-def _standings_file() -> Path:
-    return _rose_dir() / "Classifica_BUTTERATA-4SEASON-LEAGUE.xlsx"
+# ---------------------------------------------------------------------------
+# Excel parsing helpers (used by upload endpoint to populate DB)
+# ---------------------------------------------------------------------------
 
 
 def _parse_round_number(label: str) -> int:
@@ -70,25 +144,50 @@ def _parse_round_number(label: str) -> int:
 
 
 def _clean_text(value: object) -> str:
-    return str(value).replace("�", "°").strip()
+    return str(value).replace("â°", "°").replace("�", "°").strip()
 
 
-def _load_sheet(path: Path):
-    if not path.exists():
-        raise FileNotFoundError(f"Missing source file: {path}")
-    return load_workbook(path, data_only=True).active
+def _load_sheet(content: bytes):
+    from io import BytesIO
+
+    return load_workbook(BytesIO(content), data_only=True).active
 
 
-def _parse_calendar() -> tuple[str, str | None, list[ScheduleRound]]:
-    sheet = _load_sheet(_calendar_file())
-    title = _clean_text(sheet.cell(row=1, column=1).value or "Calendario")
-    source_url = sheet.cell(row=2, column=1).value
-    rounds: list[ScheduleRound] = []
+def parse_standings_excel(content: bytes) -> list[dict]:
+    """Parse standings Excel bytes → list of row dicts."""
+    ws = _load_sheet(content)
+    rows = []
+    for row in range(5, ws.max_row + 1):
+        position = ws.cell(row=row, column=1).value
+        team = ws.cell(row=row, column=2).value
+        if position is None or not team:
+            continue
+        rows.append(
+            {
+                "position": int(position),
+                "team_name": _clean_text(team),
+                "played": int(ws.cell(row=row, column=4).value or 0),
+                "wins": int(ws.cell(row=row, column=5).value or 0),
+                "draws": int(ws.cell(row=row, column=6).value or 0),
+                "losses": int(ws.cell(row=row, column=7).value or 0),
+                "goals_for": int(ws.cell(row=row, column=8).value or 0),
+                "goals_against": int(ws.cell(row=row, column=9).value or 0),
+                "goal_diff": int(ws.cell(row=row, column=10).value or 0),
+                "points": int(ws.cell(row=row, column=11).value or 0),
+                "total_points": float(ws.cell(row=row, column=12).value or 0),
+            }
+        )
+    return rows
 
+
+def parse_calendar_excel(content: bytes) -> list[dict]:
+    """Parse calendar Excel bytes → list of round dicts with nested matches."""
+    ws = _load_sheet(content)
+    rounds = []
     row = 4
-    while row <= sheet.max_row:
-        left_header = sheet.cell(row=row, column=1).value
-        right_header = sheet.cell(row=row, column=7).value
+    while row <= ws.max_row:
+        left_header = ws.cell(row=row, column=1).value
+        right_header = ws.cell(row=row, column=7).value
         if left_header is None and right_header is None:
             row += 1
             continue
@@ -100,90 +199,102 @@ def _parse_calendar() -> tuple[str, str | None, list[ScheduleRound]]:
             if not header_value:
                 continue
             league_round = _parse_round_number(_clean_text(header_value))
-            serie_a_value = sheet.cell(row=row, column=serie_a_col).value
+            serie_a_value = ws.cell(row=row, column=serie_a_col).value
             serie_a_round = (
                 _parse_round_number(_clean_text(serie_a_value))
                 if serie_a_value
                 else None
             )
-            matches: list[ScheduleMatch] = []
-
-            for match_row in range(row + 1, min(row + 6, sheet.max_row + 1)):
-                home_team = sheet.cell(row=match_row, column=start_col).value
-                away_team = sheet.cell(row=match_row, column=start_col + 3).value
-                result = sheet.cell(row=match_row, column=start_col + 4).value
+            matches = []
+            for i, match_row in enumerate(range(row + 1, min(row + 6, ws.max_row + 1))):
+                home_team = ws.cell(row=match_row, column=start_col).value
+                away_team = ws.cell(row=match_row, column=start_col + 3).value
+                result = ws.cell(row=match_row, column=start_col + 4).value
                 if not home_team and not away_team:
                     continue
+                home_score_val = ws.cell(row=match_row, column=start_col + 1).value
+                away_score_val = ws.cell(row=match_row, column=start_col + 2).value
                 matches.append(
-                    ScheduleMatch(
-                        home_team=_clean_text(home_team or "-"),
-                        home_score=(
-                            float(sheet.cell(row=match_row, column=start_col + 1).value)
-                            if sheet.cell(row=match_row, column=start_col + 1).value
-                            is not None
+                    {
+                        "match_order": i,
+                        "home_team": _clean_text(home_team or "-"),
+                        "away_team": _clean_text(away_team or "-"),
+                        "home_score": (
+                            float(home_score_val)
+                            if home_score_val is not None
                             else None
                         ),
-                        away_score=(
-                            float(sheet.cell(row=match_row, column=start_col + 2).value)
-                            if sheet.cell(row=match_row, column=start_col + 2).value
-                            is not None
+                        "away_score": (
+                            float(away_score_val)
+                            if away_score_val is not None
                             else None
                         ),
-                        away_team=_clean_text(away_team or "-"),
-                        result=_clean_text(result) if result else None,
-                    )
+                        "result": _clean_text(result) if result else None,
+                    }
                 )
-
             rounds.append(
-                ScheduleRound(
-                    league_round=league_round,
-                    serie_a_round=serie_a_round,
-                    matches=matches,
-                )
+                {
+                    "league_round": league_round,
+                    "serie_a_round": serie_a_round,
+                    "matches": matches,
+                }
             )
 
         row += 6
 
-    return title, source_url, rounds
+    return rounds
 
 
-def _parse_standings() -> tuple[str, str | None, list[StandingRow]]:
-    sheet = _load_sheet(_standings_file())
-    title = _clean_text(sheet.cell(row=1, column=1).value or "Classifica")
-    source_url = sheet.cell(row=2, column=1).value
-    rows: list[StandingRow] = []
+def parse_rose_excel(content: bytes) -> list[dict]:
+    """Parse rose Excel bytes → list of {team_name, players} dicts."""
+    from app.services.player_finance_rules import fascia_from_cost, salary_from_cost
 
-    for row in range(5, sheet.max_row + 1):
-        position = sheet.cell(row=row, column=1).value
-        team = sheet.cell(row=row, column=2).value
-        if position is None or not team:
-            continue
-        rows.append(
-            StandingRow(
-                position=int(position),
-                team=_clean_text(team),
-                played=int(sheet.cell(row=row, column=4).value or 0),
-                wins=int(sheet.cell(row=row, column=5).value or 0),
-                draws=int(sheet.cell(row=row, column=6).value or 0),
-                losses=int(sheet.cell(row=row, column=7).value or 0),
-                goals_for=int(sheet.cell(row=row, column=8).value or 0),
-                goals_against=int(sheet.cell(row=row, column=9).value or 0),
-                goal_diff=int(sheet.cell(row=row, column=10).value or 0),
-                points=int(sheet.cell(row=row, column=11).value or 0),
-                total_points=float(sheet.cell(row=row, column=12).value or 0),
+    ws = _load_sheet(content)
+    teams = []
+
+    for start_col in (1, 6):
+        row = 5
+        while row <= ws.max_row:
+            team_name = ws.cell(row, start_col).value
+            next_label = (
+                ws.cell(row + 1, start_col).value if row + 1 <= ws.max_row else None
             )
-        )
+            if team_name and str(next_label).strip() == "Ruolo":
+                players = []
+                current_team = str(team_name).strip()
+                row += 2
+                while row <= ws.max_row:
+                    role = ws.cell(row, start_col).value
+                    name = ws.cell(row, start_col + 1).value
+                    club = ws.cell(row, start_col + 2).value
+                    cost_raw = ws.cell(row, start_col + 3).value
+                    if role is None and name is None:
+                        break
+                    if name:
+                        cost = float(
+                            str(cost_raw or "0").strip().replace(",", ".") or 0
+                        )
+                        players.append(
+                            {
+                                "name": str(name).strip(),
+                                "role": str(role or "").strip(),
+                                "fascia": fascia_from_cost(cost),
+                                "salary": salary_from_cost(cost),
+                                "market_value": cost,
+                                "contract_years_total": 1,
+                                "contract_years_remaining": 1,
+                                "acquisition_type": "owned",
+                                "notes": (
+                                    f"Club origine: {str(club).strip()}"
+                                    if club
+                                    else None
+                                ),
+                                "is_active": True,
+                            }
+                        )
+                    row += 1
+                teams.append({"team_name": current_team, "players": players})
+            else:
+                row += 1
 
-    return title, source_url, rows
-
-
-@lru_cache(maxsize=1)
-def get_league_calendar_data() -> LeagueCalendarData:
-    standings_title, source_url, standings = _parse_standings()
-    calendar_title, calendar_source_url, rounds = _parse_calendar()
-    return LeagueCalendarData(
-        title=standings_title or calendar_title,
-        source_url=source_url or calendar_source_url,
-        standings=standings,
-        rounds=rounds,
-    )
+    return teams

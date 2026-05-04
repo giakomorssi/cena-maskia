@@ -90,7 +90,12 @@ from app.services.balance_guided_service import (
     normalize_guided_entries,
     sync_balance_draft,
 )
-from app.services.league_calendar_service import get_league_calendar_data
+from app.services.league_calendar_service import (
+    get_league_calendar_data_from_db,
+    parse_calendar_excel,
+    parse_rose_excel,
+    parse_standings_excel,
+)
 from app.services.balance_service import BalanceImportService, SanctionService
 from app.services.trade_service import is_auto_market_transfer
 
@@ -99,19 +104,14 @@ router = APIRouter(tags=["League"])
 AdminDep = Depends(require_admin)
 TeamDep = Depends(get_current_team)
 
-UPLOADABLE_LEAGUE_FILES = {
-    "rose": "Rose_cena-maskia-championship.xlsx",
-    "calendar": "Calendario_BUTTERATA-4SEASON-LEAGUE.xlsx",
-    "classifica": "Classifica_BUTTERATA-4SEASON-LEAGUE.xlsx",
-}
-
+UPLOADABLE_LEAGUE_KINDS = {"rose", "calendar", "classifica"}
 
 calendar_router = APIRouter(prefix="/calendar", tags=["Calendar"])
 
 
 @calendar_router.get("/", response_model=LeagueCalendarResponse)
-def get_league_calendar():
-    data = get_league_calendar_data()
+def get_league_calendar(db: Session = Depends(get_db)):
+    data = get_league_calendar_data_from_db(db)
     return LeagueCalendarResponse.model_validate(asdict(data))
 
 
@@ -149,34 +149,94 @@ def _resolve_current_season(db: Session) -> Season | None:
     )
 
 
-def _league_assets_dir() -> Path:
-    # Use env var if set, otherwise fall back to /app/rose (writable in Docker)
-    import os
-    base = os.environ.get("ASSETS_DIR", str(Path(__file__).resolve().parents[3] / "rose"))
-    return Path(base)
+def _import_standings_to_db(db: Session, content: bytes) -> int:
+    from app.models.league import Season, StandingRow as StandingRowModel
+    from sqlalchemy import delete as sa_delete
+
+    current_season = db.execute(
+        select(Season).where(Season.is_current.is_(True))
+    ).scalar_one_or_none()
+    if not current_season:
+        raise HTTPException(400, "Nessuna stagione corrente impostata")
+
+    rows = parse_standings_excel(content)
+    if not rows:
+        raise HTTPException(400, "Nessuna riga trovata nel file classifica")
+
+    db.execute(
+        sa_delete(StandingRowModel).where(
+            StandingRowModel.season_id == current_season.id
+        )
+    )
+    for r in rows:
+        db.add(StandingRowModel(season_id=current_season.id, **r))
+    db.commit()
+    return len(rows)
 
 
-def _store_league_excel(kind: str, filename: str, content: bytes) -> Path:
-    if kind == "standings":
-        kind = "classifica"
+def _import_calendar_to_db(db: Session, content: bytes) -> int:
+    from app.models.league import CalendarRound, CalendarMatch, Season
+    from sqlalchemy import delete as sa_delete
 
-    extension = Path(filename or "").suffix.lower()
-    if extension not in {".xlsx", ".xls"}:
-        raise HTTPException(400, "Carica un file Excel .xlsx o .xls")
+    current_season = db.execute(
+        select(Season).where(Season.is_current.is_(True))
+    ).scalar_one_or_none()
+    if not current_season:
+        raise HTTPException(400, "Nessuna stagione corrente impostata")
 
-    target_name = UPLOADABLE_LEAGUE_FILES.get(kind)
-    if not target_name:
-        raise HTTPException(400, "Tipo file non supportato")
+    rounds_data = parse_calendar_excel(content)
+    if not rounds_data:
+        raise HTTPException(400, "Nessun girone trovato nel file calendario")
 
-    assets_dir = _league_assets_dir()
-    assets_dir.mkdir(parents=True, exist_ok=True)
-    target_path = assets_dir / target_name
-    target_path.write_bytes(content)
+    db.execute(
+        sa_delete(CalendarRound).where(CalendarRound.season_id == current_season.id)
+    )
+    for rnd in rounds_data:
+        db_round = CalendarRound(
+            season_id=current_season.id,
+            league_round=rnd["league_round"],
+            serie_a_round=rnd["serie_a_round"],
+        )
+        db.add(db_round)
+        db.flush()
+        for m in rnd["matches"]:
+            db.add(CalendarMatch(round_id=db_round.id, **m))
+    db.commit()
+    return len(rounds_data)
 
-    if kind in {"calendar", "classifica"}:
-        get_league_calendar_data.cache_clear()
 
-    return target_path
+def _import_rose_to_db(db: Session, content: bytes) -> int:
+    from app.models.league import Player, Season, Team
+    from sqlalchemy import delete as sa_delete
+
+    current_season = db.execute(
+        select(Season).where(Season.is_current.is_(True))
+    ).scalar_one_or_none()
+    if not current_season:
+        raise HTTPException(400, "Nessuna stagione corrente impostata")
+
+    teams_data = parse_rose_excel(content)
+    if not teams_data:
+        raise HTTPException(400, "Nessuna squadra trovata nel file rose")
+
+    imported = 0
+    for team_data in teams_data:
+        team = db.execute(
+            select(Team).where(Team.name == team_data["team_name"])
+        ).scalar_one_or_none()
+        if not team:
+            continue
+        db.execute(
+            sa_delete(Player).where(
+                Player.team_id == team.id,
+                Player.season_id == current_season.id,
+            )
+        )
+        for p in team_data["players"]:
+            db.add(Player(team_id=team.id, season_id=current_season.id, **p))
+            imported += 1
+    db.commit()
+    return imported
 
 
 def _load_balance_with_entries(db: Session, stmt):
@@ -1134,18 +1194,29 @@ def verify_admin():
 
 
 @router.post("/admin/uploads/{kind}", dependencies=[AdminDep])
-async def upload_league_asset(kind: str, file: Annotated[UploadFile, File()]):
+async def upload_league_asset(
+    kind: str, file: Annotated[UploadFile, File()], db: Session = Depends(get_db)
+):
+    if kind not in UPLOADABLE_LEAGUE_KINDS:
+        raise HTTPException(400, "Tipo file non supportato")
+
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in {".xlsx", ".xls"}:
+        raise HTTPException(400, "Carica un file Excel .xlsx o .xls")
+
     content = await file.read()
     if not content:
         raise HTTPException(400, "File vuoto")
 
-    saved_path = _store_league_excel(kind, file.filename or "", content)
-    return {
-        "ok": True,
-        "kind": kind,
-        "filename": saved_path.name,
-        "size": len(content),
-    }
+    if kind == "classifica":
+        count = _import_standings_to_db(db, content)
+        return {"ok": True, "kind": kind, "imported": count}
+    elif kind == "calendar":
+        count = _import_calendar_to_db(db, content)
+        return {"ok": True, "kind": kind, "imported": count}
+    elif kind == "rose":
+        count = _import_rose_to_db(db, content)
+        return {"ok": True, "kind": kind, "imported": count}
 
 
 @router.post("/team-auth/login", response_model=TeamLoginResponse)

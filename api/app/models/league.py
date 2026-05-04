@@ -396,3 +396,90 @@ class TradeProposalItem(Base):
         "TradeProposal", back_populates="items"
     )
     player: Mapped[Player] = relationship("Player")
+
+
+# ============================================================
+# Standings (Classifica)
+# ============================================================
+class StandingRow(Base):
+    __tablename__ = "standing_rows"
+    __table_args__ = (
+        UniqueConstraint("season_id", "position", name="uq_standing_season_position"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    season_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    team_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    played: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    wins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    draws: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    losses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    goals_for: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    goals_against: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    goal_diff: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_points: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    season: Mapped[Season] = relationship("Season")
+
+
+# ============================================================
+# Calendar Rounds & Matches (Calendario)
+# ============================================================
+class CalendarRound(Base):
+    __tablename__ = "calendar_rounds"
+    __table_args__ = (
+        UniqueConstraint("season_id", "league_round", name="uq_calendar_season_round"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    season_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False
+    )
+    league_round: Mapped[int] = mapped_column(Integer, nullable=False)
+    serie_a_round: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    season: Mapped[Season] = relationship("Season")
+    matches: Mapped[list["CalendarMatch"]] = relationship(
+        "CalendarMatch",
+        back_populates="round",
+        cascade="all, delete-orphan",
+        order_by="CalendarMatch.match_order",
+    )
+
+
+class CalendarMatch(Base):
+    __tablename__ = "calendar_matches"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    round_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("calendar_rounds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    match_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    home_team: Mapped[str] = mapped_column(String(160), nullable=False)
+    away_team: Mapped[str] = mapped_column(String(160), nullable=False)
+    home_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    away_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    result: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    round: Mapped[CalendarRound] = relationship(
+        "CalendarRound", back_populates="matches"
+    )
