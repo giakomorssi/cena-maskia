@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-# Get the DNS resolver from the system (works on Railway, Docker, etc.)
-DNS_RESOLVER=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
+# Get the first IPv4 DNS resolver from the system (IPv6 breaks nginx resolver syntax)
+DNS_RESOLVER=$(awk '/^nameserver/ && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $2; exit}' /etc/resolv.conf)
 export DNS_RESOLVER=${DNS_RESOLVER:-8.8.8.8}
 
 # Set default port if not provided by Railway
