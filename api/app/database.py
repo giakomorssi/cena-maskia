@@ -600,9 +600,15 @@ def seed_demo_team_activity() -> None:
             balance.sanction_points = payload["sanction_points"]
             balance.sanction_notes = payload["sanction_notes"]
             balance.file_url = None
-            existing_entries = session.execute(
-                select(BalanceEntry).where(BalanceEntry.balance_sheet_id == balance.id)
-            ).scalars().all()
+            existing_entries = (
+                session.execute(
+                    select(BalanceEntry).where(
+                        BalanceEntry.balance_sheet_id == balance.id
+                    )
+                )
+                .scalars()
+                .all()
+            )
             if not existing_entries:
                 for section, label, amount in payload["entries"]:
                     session.add(
@@ -827,12 +833,6 @@ def init_db() -> None:
 
         # Create tables if they don't exist
         database_manager.create_all_tables()
-
-        # Seed base team accounts on fresh installs
-        seed_default_teams()
-
-        # Seed one demo squad with visible activity for the frontend
-        seed_demo_team_activity()
 
         logger.info("Database system initialized successfully")
 
