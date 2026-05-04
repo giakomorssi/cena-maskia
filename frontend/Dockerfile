@@ -18,6 +18,9 @@ RUN npm run build -- --configuration=production
 # Stage 2: Serve with nginx
 FROM nginx:alpine
 
+# Install gettext for envsubst (not included in nginx:alpine by default)
+RUN apk add --no-cache gettext
+
 # Remove default nginx config
 RUN rm -rf /etc/nginx/conf.d/* /etc/nginx/templates/*
 
