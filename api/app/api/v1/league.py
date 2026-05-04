@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 from dataclasses import asdict
@@ -29,6 +30,8 @@ from app.config import settings
 from app.core.auth import get_current_team, optional_admin, optional_team, require_admin
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.database import get_db
+
+logger = logging.getLogger(__name__)
 from app.models.league import (
     BalanceEntry,
     BalanceSheet,
@@ -248,9 +251,13 @@ def _import_rose_to_db(db: Session, content: bytes) -> int:
                 Player.season_id == current_season.id,
             )
         )
-        for p in team_data["players"]:
-            db.add(Player(team_id=team.id, season_id=current_season.id, **p))
-            imported += 1
+        db.add_all(
+            [
+                Player(team_id=team.id, season_id=current_season.id, **p)
+                for p in team_data["players"]
+            ]
+        )
+        imported += len(team_data["players"])
     db.commit()
     return imported
 
@@ -1224,15 +1231,25 @@ def upload_league_asset(
     if not content:
         raise HTTPException(400, "File vuoto")
 
-    if kind == "classifica":
-        count = _import_standings_to_db(db, content)
-        return {"ok": True, "kind": kind, "imported": count}
-    elif kind == "calendar":
-        count = _import_calendar_to_db(db, content)
-        return {"ok": True, "kind": kind, "imported": count}
-    elif kind == "rose":
-        count = _import_rose_to_db(db, content)
-        return {"ok": True, "kind": kind, "imported": count}
+    logger.info("Upload %s: %d bytes, file=%s", kind, len(content), file.filename)
+    try:
+        if kind == "classifica":
+            count = _import_standings_to_db(db, content)
+        elif kind == "calendar":
+            count = _import_calendar_to_db(db, content)
+        elif kind == "rose":
+            count = _import_rose_to_db(db, content)
+        else:
+            raise HTTPException(400, "Tipo file non supportato")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Upload %s failed: %s", kind, exc)
+        db.rollback()
+        raise HTTPException(500, f"Errore durante l'importazione: {exc}") from exc
+
+    logger.info("Upload %s: imported %d records", kind, count)
+    return {"ok": True, "kind": kind, "imported": count}
 
 
 @router.post("/team-auth/login", response_model=TeamLoginResponse)

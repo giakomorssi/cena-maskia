@@ -6,7 +6,7 @@ set -e
 # Set default port if not provided by Railway
 export PORT=${PORT:-80}
 
-envsubst '${API_URL} ${PORT}' < /etc/nginx/templates/default.conf.template \
+envsubst '${PORT}' < /etc/nginx/templates/default.conf.template \
     > /etc/nginx/conf.d/default.conf
 
 exec "$@"

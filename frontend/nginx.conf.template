@@ -23,7 +23,7 @@ server {
     # Docker Compose default: http://api:8000
     # Railway: https://<api-service>.railway.app
     location /api/ {
-        proxy_pass ${API_URL}/api/;
+        proxy_pass http://cena-maskia.railway.internal:8080/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -32,6 +32,10 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        client_max_body_size 50m;
     }
 
     # Angular app - serve index.html for all routes (SPA)
