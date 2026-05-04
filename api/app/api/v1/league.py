@@ -1194,7 +1194,7 @@ def verify_admin():
 
 
 @router.post("/admin/uploads/{kind}", dependencies=[AdminDep])
-async def upload_league_asset(
+def upload_league_asset(
     kind: str, file: Annotated[UploadFile, File()], db: Session = Depends(get_db)
 ):
     if kind not in UPLOADABLE_LEAGUE_KINDS:
@@ -1204,7 +1204,7 @@ async def upload_league_asset(
     if ext not in {".xlsx", ".xls"}:
         raise HTTPException(400, "Carica un file Excel .xlsx o .xls")
 
-    content = await file.read()
+    content = file.file.read()
     if not content:
         raise HTTPException(400, "File vuoto")
 

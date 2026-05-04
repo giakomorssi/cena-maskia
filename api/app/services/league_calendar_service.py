@@ -268,7 +268,12 @@ def parse_rose_excel(content: bytes) -> list[dict]:
                     name = ws.cell(row, start_col + 1).value
                     club = ws.cell(row, start_col + 2).value
                     cost_raw = ws.cell(row, start_col + 3).value
-                    if role is None and name is None:
+                    role_text = str(role or "").strip()
+                    if role_text.startswith("Crediti Residui:"):
+                        row += 1
+                        break
+                    if all(v is None for v in (role, name, club, cost_raw)):
+                        row += 1
                         break
                     if name:
                         cost = float(
@@ -277,7 +282,7 @@ def parse_rose_excel(content: bytes) -> list[dict]:
                         players.append(
                             {
                                 "name": str(name).strip(),
-                                "role": str(role or "").strip(),
+                                "role": role_text,
                                 "fascia": fascia_from_cost(cost),
                                 "salary": salary_from_cost(cost),
                                 "market_value": cost,
@@ -293,8 +298,8 @@ def parse_rose_excel(content: bytes) -> list[dict]:
                             }
                         )
                     row += 1
-                teams.append({"team_name": current_team, "players": players})
-            else:
-                row += 1
+                if players:
+                    teams.append({"team_name": current_team, "players": players})
+            row += 1
 
     return teams
