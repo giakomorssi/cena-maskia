@@ -150,7 +150,10 @@ def _resolve_current_season(db: Session) -> Season | None:
 
 
 def _league_assets_dir() -> Path:
-    return Path(__file__).resolve().parents[4] / "rose"
+    # Use env var if set, otherwise fall back to /app/rose (writable in Docker)
+    import os
+    base = os.environ.get("ASSETS_DIR", str(Path(__file__).resolve().parents[3] / "rose"))
+    return Path(base)
 
 
 def _store_league_excel(kind: str, filename: str, content: bytes) -> Path:
