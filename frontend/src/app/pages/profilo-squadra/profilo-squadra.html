@@ -52,16 +52,17 @@
         </div>
 
         @if (selectedTeam(); as team) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
-            (click)="clearSelectedTeam()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" (click)="clearSelectedTeam()">
             <div class="w-full max-w-md overflow-hidden rounded-[28px] border border-border bg-surface shadow-2xl"
                 (click)="$event.stopPropagation()">
                 <div class="border-b border-border bg-linear-to-r from-surface-inset to-gold-soft/50 px-6 py-6">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-text-tertiary">Accesso squadra</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-text-tertiary">Accesso
+                                squadra</p>
                             <h3 class="mt-2 font-display text-2xl font-bold text-text">{{ team.name }}</h3>
-                            <p class="mt-2 text-sm text-text-secondary">Inserisci la password per entrare nel profilo della squadra.</p>
+                            <p class="mt-2 text-sm text-text-secondary">Inserisci la password per entrare nel profilo
+                                della squadra.</p>
                         </div>
                         <button type="button" class="btn btn-ghost p-2" aria-label="Chiudi accesso squadra"
                             (click)="clearSelectedTeam()">
@@ -78,8 +79,7 @@
                     <label class="block mb-4">
                         <span class="input-label">Password squadra</span>
                         <input class="input mt-2" type="password" [value]="password()"
-                            (input)="setPassword($any($event.target).value)"
-                            (keydown.enter)="loginSelectedTeam()" />
+                            (input)="setPassword($any($event.target).value)" (keydown.enter)="loginSelectedTeam()" />
                     </label>
                     <div class="flex gap-3 justify-end">
                         <button type="button" class="btn btn-ghost" (click)="clearSelectedTeam()">Annulla</button>
@@ -143,8 +143,7 @@
             </div>
 
             <!-- Stat strip -->
-            <div
-                class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border border-t border-border">
+            <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border border-t border-border">
                 <div class="px-6 py-4">
                     <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">Stagione corrente</p>
                     <p class="font-display text-xl font-bold">{{ d.current_season?.name ?? '&#8212;' }}</p>
@@ -226,7 +225,8 @@
                         <a routerLink="/rose"
                             class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
                             <div
-                                class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-sm font-bold text-emerald-700 shrink-0">R</div>
+                                class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-sm font-bold text-emerald-700 shrink-0">
+                                R</div>
                             <div>
                                 <p class="font-semibold text-sm">Rosa</p>
                                 <p class="text-xs text-text-tertiary">Stipendi, valori, contratti</p>
@@ -235,7 +235,8 @@
                         <a routerLink="/economia-squadra"
                             class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
                             <div
-                                class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-sm font-bold text-amber-700 shrink-0">E</div>
+                                class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-sm font-bold text-amber-700 shrink-0">
+                                E</div>
                             <div>
                                 <p class="font-semibold text-sm">Economia squadra</p>
                                 <p class="text-xs text-text-tertiary">Stadio, sponsor, premi</p>
@@ -244,7 +245,8 @@
                         <a routerLink="/bilanci"
                             class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
                             <div
-                                class="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">B</div>
+                                class="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">
+                                B</div>
                             <div>
                                 <p class="font-semibold text-sm">Bilancio</p>
                                 <p class="text-xs text-text-tertiary">Compila online o upload</p>
@@ -253,7 +255,8 @@
                         <a routerLink="/mercato"
                             class="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset p-4 hover:border-brand hover:shadow-sm transition-all">
                             <div
-                                class="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-sm font-bold text-purple-700 shrink-0">M</div>
+                                class="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-sm font-bold text-purple-700 shrink-0">
+                                M</div>
                             <div>
                                 <p class="font-semibold text-sm">Mercato</p>
                                 <p class="text-xs text-text-tertiary">Proposte e ratifica</p>
@@ -354,8 +357,7 @@
                     <h3 class="font-display text-lg font-bold mb-4">Palmares</h3>
                     <div class="space-y-2">
                         @for (h of orderedHonors(); track h.id) {
-                        <div
-                            class="flex items-center gap-3 rounded-xl border border-border bg-surface-inset px-4 py-3">
+                        <div class="flex items-center gap-3 rounded-xl border border-border bg-surface-inset px-4 py-3">
                             <span class="text-xl shrink-0">
                                 @switch (h.position) {
                                 @case (1) { &#129351; }
