@@ -90,6 +90,33 @@ class Settings(BaseSettings):
     connection_timeout: int = Field(default=10)
     read_timeout: int = Field(default=30)
 
+    # Remote Fantacalcio asset refresh
+    fantacalcio_league_base_url: str = Field(
+        default="https://leghe.fantacalcio.it", alias="FANTACALCIO_LEAGUE_BASE_URL"
+    )
+    fantacalcio_league_slug: str = Field(
+        default="cena-maskia-championship", alias="FANTACALCIO_LEAGUE_SLUG"
+    )
+    fantacalcio_ssl_verify: bool = Field(default=True, alias="FANTACALCIO_SSL_VERIFY")
+    fantacalcio_ca_bundle: str | None = Field(
+        default=None, alias="FANTACALCIO_CA_BUNDLE"
+    )
+    fantacalcio_classifica_export_url: str | None = Field(
+        default=None, alias="FANTACALCIO_CLASSIFICA_EXPORT_URL"
+    )
+    fantacalcio_rose_export_url: str | None = Field(
+        default=None, alias="FANTACALCIO_ROSE_EXPORT_URL"
+    )
+    fantacalcio_calendar_export_url: str | None = Field(
+        default=None, alias="FANTACALCIO_CALENDAR_EXPORT_URL"
+    )
+    fantacalcio_auto_standings_enabled: bool = Field(
+        default=True, alias="FANTACALCIO_AUTO_STANDINGS_ENABLED"
+    )
+    fantacalcio_auto_refresh_timezone: str = Field(
+        default="Europe/Rome", alias="FANTACALCIO_AUTO_REFRESH_TIMEZONE"
+    )
+
     # Environment detection helpers
     debug: bool = Field(default=True)
     environment: str = Field(default="development")

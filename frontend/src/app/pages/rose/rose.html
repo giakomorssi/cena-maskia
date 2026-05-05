@@ -44,7 +44,7 @@
         </div>
       </div>
 
-      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[180px_minmax(0,1fr)] items-end">
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3 items-end">
         <label
           class="flex flex-col rounded-2xl border border-border bg-surface-inset/45 px-3 py-3 text-xs uppercase tracking-wide text-text-tertiary">
           <span>Stagione</span>
@@ -52,6 +52,16 @@
             @for (s of seasons(); track s.id) { <option [value]="s.id">{{ s.name }}</option> }
           </select>
         </label>
+        @if (canEdit()) {
+        <label
+          class="flex flex-col rounded-2xl border border-border bg-surface-inset/45 px-3 py-3 text-xs uppercase tracking-wide text-text-tertiary">
+          <span>Squadra di appartenenza</span>
+          <select class="input mt-2 bg-white" [ngModel]="teamId()" (ngModelChange)="onTeamChange($event)">
+            <option value="">Tutte</option>
+            @for (t of teams(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
+          </select>
+        </label>
+        }
         <label
           class="flex flex-col rounded-2xl border border-border bg-surface-inset/45 px-3 py-3 text-xs uppercase tracking-wide text-text-tertiary">
           <span>Cerca giocatore o tag</span>
@@ -107,18 +117,6 @@
           </div>
         </div>
       </div>
-
-      @if (canEdit()) {
-      <div class="rounded-2xl border border-border bg-surface-inset/35 px-3 py-3">
-        <label class="flex flex-col text-xs uppercase tracking-wide text-text-tertiary md:max-w-sm">
-          <span>Squadra</span>
-          <select class="input mt-2 bg-white" [ngModel]="teamId()" (ngModelChange)="onTeamChange($event)">
-            <option value="">Tutte</option>
-            @for (t of teams(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
-          </select>
-        </label>
-      </div>
-      }
     </div>
 
     @if (error()) { <div class="alert alert-error">{{ error() }}</div> }

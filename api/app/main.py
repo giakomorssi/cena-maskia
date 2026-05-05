@@ -1,5 +1,7 @@
 """FastAPI application factory for FastAPI Template"""
 
+import asyncio
+
 # Load environment variables FIRST, before any other imports
 # This ensures libraries can access env vars
 from dotenv import load_dotenv
@@ -9,8 +11,10 @@ import os
 load_dotenv()
 
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timedelta
 from typing import Dict, Any
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -38,6 +42,46 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _next_weekly_standings_refresh(now: datetime) -> datetime:
+    target = now.replace(hour=1, minute=0, second=0, microsecond=0)
+    days_until_tuesday = (1 - now.weekday()) % 7
+    target = target + timedelta(days=days_until_tuesday)
+    if target <= now:
+        target += timedelta(days=7)
+    return target
+
+
+async def _weekly_standings_refresh_loop() -> None:
+    timezone_name = settings.fantacalcio_auto_refresh_timezone
+    timezone = ZoneInfo(timezone_name)
+
+    while True:
+        now = datetime.now(timezone)
+        next_run = _next_weekly_standings_refresh(now)
+        delay_seconds = max((next_run - now).total_seconds(), 1.0)
+        logger.info(
+            "Next automatic standings refresh scheduled for %s",
+            next_run.isoformat(),
+        )
+        await asyncio.sleep(delay_seconds)
+
+        try:
+            from app.api.v1.league import refresh_standings_from_remote
+
+            with database_manager.get_session() as db:
+                fetched, count = refresh_standings_from_remote(db)
+            logger.info(
+                "Automatic standings refresh imported %d rows from %s (%s)",
+                count,
+                fetched.source_url,
+                fetched.source_kind,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Automatic standings refresh failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -47,6 +91,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.project_name}...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
+
+    auto_refresh_task: asyncio.Task[None] | None = None
 
     try:
         # Initialize database
@@ -63,6 +109,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Database health check failed but continuing startup: {e}")
 
+        if settings.fantacalcio_auto_standings_enabled:
+            auto_refresh_task = asyncio.create_task(
+                _weekly_standings_refresh_loop(),
+                name="weekly-standings-refresh",
+            )
+            logger.info("Automatic weekly standings refresh enabled")
+
         logger.info(f"{settings.project_name} startup complete")
         yield
 
@@ -78,6 +131,10 @@ async def lifespan(app: FastAPI):
     logger.info(f"Shutting down {settings.project_name}...")
 
     try:
+        if auto_refresh_task is not None:
+            auto_refresh_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await auto_refresh_task
         close_db()
         logger.info("Application shutdown complete")
     except Exception as e:

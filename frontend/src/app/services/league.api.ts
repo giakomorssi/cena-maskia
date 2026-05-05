@@ -26,6 +26,18 @@ import {
 } from '../models/league.model';
 
 export type LeagueAssetUploadKind = 'rose' | 'calendar' | 'classifica';
+export type LeagueAssetUploadResponse = {
+  ok: boolean;
+  kind: LeagueAssetUploadKind;
+  imported: number;
+};
+export type LeagueAssetRefreshResponse = {
+  ok: boolean;
+  kind: LeagueAssetUploadKind;
+  imported: number;
+  source_kind: 'excel' | 'html';
+  source_url: string;
+};
 
 @Injectable({ providedIn: 'root' })
 export class LeagueApi {
@@ -175,12 +187,14 @@ export class LeagueApi {
   uploadLeagueAsset(kind: LeagueAssetUploadKind, file: File) {
     const fd = new FormData();
     fd.append('file', file);
-    return this.http.post<{
-      ok: boolean;
-      kind: LeagueAssetUploadKind;
-      filename: string;
-      size: number;
-    }>(`${this.base}admin/uploads/${kind}`, fd);
+    return this.http.post<LeagueAssetUploadResponse>(`${this.base}admin/uploads/${kind}`, fd);
+  }
+
+  refreshLeagueAsset(kind: LeagueAssetUploadKind) {
+    return this.http.post<LeagueAssetRefreshResponse>(
+      `${this.base}admin/assets/${kind}/refresh`,
+      {},
+    );
   }
 
   teamLogin(username: string, password: string) {

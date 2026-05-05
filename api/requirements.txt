@@ -23,6 +23,7 @@ prometheus-client==0.24.1
 
 # HTTP Client
 httpx==0.28.1
+beautifulsoup4==4.13.4
 
 # Authentication (optional - for future use if needed)
 python-jose[cryptography]==3.5.0
