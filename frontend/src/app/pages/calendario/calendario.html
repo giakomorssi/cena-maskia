@@ -169,16 +169,10 @@
                     <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 gap-2">
                         @for (round of rounds(); track round.league_round) {
                         <button type="button" class="rounded-2xl border px-3 py-3 text-center transition-all"
-                            [class.bg-pitch]="isSelectedRound(round.league_round)"
-                            [class.border-pitch]="isSelectedRound(round.league_round)"
-                            [class.text-white]="isSelectedRound(round.league_round)"
-                            [class.shadow-soft]="isSelectedRound(round.league_round)"
-                            [class.bg-surface]="!isSelectedRound(round.league_round)"
-                            [class.border-border]="!isSelectedRound(round.league_round)"
+                            [class]="'rounded-2xl border px-3 py-3 text-center transition-all ' + roundCardClass(round)"
                             (click)="selectRound(round.league_round)">
                             <p class="font-display text-lg font-bold leading-none">{{ round.league_round }}</p>
-                            <p class="text-xs mt-1" [class.text-white/80]="isSelectedRound(round.league_round)"
-                                [class.text-text-tertiary]="!isSelectedRound(round.league_round)">
+                            <p class="text-xs mt-1" [class]="'text-xs mt-1 ' + roundMetaClass(round)">
                                 A {{ round.serie_a_round ?? '—' }}
                             </p>
                         </button>

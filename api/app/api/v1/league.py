@@ -99,6 +99,10 @@ from app.services.league_calendar_service import (
     parse_rose_excel,
     parse_standings_excel,
 )
+from app.services.league_asset_refresh_service import (
+    refresh_remote_league_asset,
+    RemoteLeagueAssetError,
+)
 from app.services.balance_service import BalanceImportService, SanctionService
 from app.services.trade_service import is_auto_market_transfer
 
@@ -152,75 +156,108 @@ def _resolve_current_season(db: Session) -> Season | None:
     )
 
 
-def _import_standings_to_db(db: Session, content: bytes) -> int:
-    from app.models.league import Season, StandingRow as StandingRowModel
-    from sqlalchemy import delete as sa_delete
-
+def _require_current_season(db: Session) -> Season:
     current_season = db.execute(
         select(Season).where(Season.is_current.is_(True))
     ).scalar_one_or_none()
     if not current_season:
         raise HTTPException(400, "Nessuna stagione corrente impostata")
+    return current_season
 
-    rows = parse_standings_excel(content)
+
+def _replace_standings_in_db(db: Session, season_id: UUID, rows: list[dict]) -> int:
+    from app.models.league import StandingRow as StandingRowModel
+    from sqlalchemy import delete as sa_delete
+
     if not rows:
-        raise HTTPException(400, "Nessuna riga trovata nel file classifica")
+        raise HTTPException(400, "Nessuna riga classifica da importare")
 
     db.execute(
-        sa_delete(StandingRowModel).where(
-            StandingRowModel.season_id == current_season.id
-        )
+        sa_delete(StandingRowModel).where(StandingRowModel.season_id == season_id)
     )
-    for r in rows:
-        db.add(StandingRowModel(season_id=current_season.id, **r))
+    for row in rows:
+        db.add(StandingRowModel(season_id=season_id, **row))
     db.commit()
     return len(rows)
 
 
-def _import_calendar_to_db(db: Session, content: bytes) -> int:
-    from app.models.league import CalendarRound, CalendarMatch, Season
+def _replace_calendar_in_db(
+    db: Session, season_id: UUID, rounds_data: list[dict]
+) -> int:
+    from app.models.league import CalendarMatch, CalendarRound
     from sqlalchemy import delete as sa_delete
 
-    current_season = db.execute(
-        select(Season).where(Season.is_current.is_(True))
-    ).scalar_one_or_none()
-    if not current_season:
-        raise HTTPException(400, "Nessuna stagione corrente impostata")
-
-    rounds_data = parse_calendar_excel(content)
     if not rounds_data:
-        raise HTTPException(400, "Nessun girone trovato nel file calendario")
+        raise HTTPException(400, "Nessun girone calendario da importare")
 
-    db.execute(
-        sa_delete(CalendarRound).where(CalendarRound.season_id == current_season.id)
-    )
+    db.execute(sa_delete(CalendarRound).where(CalendarRound.season_id == season_id))
     for rnd in rounds_data:
         db_round = CalendarRound(
-            season_id=current_season.id,
+            season_id=season_id,
             league_round=rnd["league_round"],
             serie_a_round=rnd["serie_a_round"],
         )
         db.add(db_round)
         db.flush()
-        for m in rnd["matches"]:
-            db.add(CalendarMatch(round_id=db_round.id, **m))
+        for match in rnd["matches"]:
+            db.add(CalendarMatch(round_id=db_round.id, **match))
     db.commit()
     return len(rounds_data)
 
 
-def _import_rose_to_db(db: Session, content: bytes) -> int:
-    from app.models.league import Player, Season, Team
+def _upsert_calendar_round_in_db(db: Session, season_id: UUID, round_data: dict) -> int:
+    from app.models.league import CalendarMatch, CalendarRound
     from sqlalchemy import delete as sa_delete
 
-    current_season = db.execute(
-        select(Season).where(Season.is_current.is_(True))
+    existing_round = db.execute(
+        select(CalendarRound).where(
+            CalendarRound.season_id == season_id,
+            CalendarRound.league_round == round_data["league_round"],
+        )
     ).scalar_one_or_none()
-    if not current_season:
-        raise HTTPException(400, "Nessuna stagione corrente impostata")
 
-    teams_data = parse_rose_excel(content)
+    has_existing_calendar = (
+        existing_round is not None
+        or db.execute(
+            select(CalendarRound.id)
+            .where(CalendarRound.season_id == season_id)
+            .limit(1)
+        ).first()
+        is not None
+    )
+    if not has_existing_calendar:
+        raise HTTPException(
+            400,
+            "Carica prima lo storico del calendario tramite Excel, poi aggiorna l'ultima giornata via scraping",
+        )
+
+    if existing_round is None:
+        existing_round = CalendarRound(
+            season_id=season_id,
+            league_round=round_data["league_round"],
+            serie_a_round=round_data.get("serie_a_round"),
+        )
+        db.add(existing_round)
+        db.flush()
+    else:
+        existing_round.serie_a_round = round_data.get("serie_a_round")
+        db.execute(
+            sa_delete(CalendarMatch).where(CalendarMatch.round_id == existing_round.id)
+        )
+
+    for match in round_data["matches"]:
+        db.add(CalendarMatch(round_id=existing_round.id, **match))
+
+    db.commit()
+    return 1
+
+
+def _replace_rose_in_db(db: Session, season_id: UUID, teams_data: list[dict]) -> int:
+    from app.models.league import Player, Team
+    from sqlalchemy import delete as sa_delete
+
     if not teams_data:
-        raise HTTPException(400, "Nessuna squadra trovata nel file rose")
+        raise HTTPException(400, "Nessuna squadra rose da importare")
 
     imported = 0
     for team_data in teams_data:
@@ -229,7 +266,6 @@ def _import_rose_to_db(db: Session, content: bytes) -> int:
         ).scalar_one_or_none()
         if not team:
             slug = _slugify_username(team_data["team_name"])
-            # Ensure username uniqueness
             base_slug = slug
             counter = 1
             while db.execute(
@@ -248,18 +284,71 @@ def _import_rose_to_db(db: Session, content: bytes) -> int:
         db.execute(
             sa_delete(Player).where(
                 Player.team_id == team.id,
-                Player.season_id == current_season.id,
+                Player.season_id == season_id,
             )
         )
         db.add_all(
             [
-                Player(team_id=team.id, season_id=current_season.id, **p)
-                for p in team_data["players"]
+                Player(team_id=team.id, season_id=season_id, **player)
+                for player in team_data["players"]
             ]
         )
         imported += len(team_data["players"])
+
     db.commit()
     return imported
+
+
+def _import_standings_to_db(db: Session, content: bytes) -> int:
+    current_season = _require_current_season(db)
+
+    rows = parse_standings_excel(content)
+    if not rows:
+        raise HTTPException(400, "Nessuna riga trovata nel file classifica")
+
+    return _replace_standings_in_db(db, current_season.id, rows)
+
+
+def _import_calendar_to_db(db: Session, content: bytes) -> int:
+    current_season = _require_current_season(db)
+
+    rounds_data = parse_calendar_excel(content)
+    if not rounds_data:
+        raise HTTPException(400, "Nessun girone trovato nel file calendario")
+
+    return _replace_calendar_in_db(db, current_season.id, rounds_data)
+
+
+def _import_rose_to_db(db: Session, content: bytes) -> int:
+    current_season = _require_current_season(db)
+
+    teams_data = parse_rose_excel(content)
+    if not teams_data:
+        raise HTTPException(400, "Nessuna squadra trovata nel file rose")
+
+    return _replace_rose_in_db(db, current_season.id, teams_data)
+
+
+def refresh_standings_from_remote(
+    db: Session,
+) -> tuple[RemoteLeagueAssetError | object, int]:
+    fetched = refresh_remote_league_asset("classifica")
+    current_season = _require_current_season(db)
+    count = _replace_standings_in_db(db, current_season.id, fetched.imported_rows)
+    return fetched, count
+
+
+def refresh_latest_calendar_round_from_remote(
+    db: Session,
+) -> tuple[RemoteLeagueAssetError | object, int]:
+    fetched = refresh_remote_league_asset("calendar")
+    current_season = _require_current_season(db)
+    if not fetched.imported_rows:
+        raise HTTPException(400, "Nessuna giornata trovata nella pagina pubblica")
+    count = _upsert_calendar_round_in_db(
+        db, current_season.id, fetched.imported_rows[0]
+    )
+    return fetched, count
 
 
 def _load_balance_with_entries(db: Session, stmt):
@@ -1250,6 +1339,47 @@ def upload_league_asset(
 
     logger.info("Upload %s: imported %d records", kind, count)
     return {"ok": True, "kind": kind, "imported": count}
+
+
+@router.post("/admin/assets/{kind}/refresh", dependencies=[AdminDep])
+def refresh_league_asset(kind: str, db: Session = Depends(get_db)):
+    if kind not in UPLOADABLE_LEAGUE_KINDS:
+        raise HTTPException(400, "Tipo file non supportato")
+
+    try:
+        if kind == "classifica":
+            fetched, count = refresh_standings_from_remote(db)
+        elif kind == "calendar":
+            fetched, count = refresh_latest_calendar_round_from_remote(db)
+        else:
+            raise HTTPException(
+                400,
+                "Le rose possono essere aggiornate solo tramite upload Excel",
+            )
+    except HTTPException:
+        raise
+    except RemoteLeagueAssetError as exc:
+        db.rollback()
+        raise HTTPException(502, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Remote refresh %s failed: %s", kind, exc)
+        db.rollback()
+        raise HTTPException(500, f"Errore durante il refresh remoto: {exc}") from exc
+
+    logger.info(
+        "Remote refresh %s: imported %d records from %s (%s)",
+        kind,
+        count,
+        fetched.source_url,
+        fetched.source_kind,
+    )
+    return {
+        "ok": True,
+        "kind": kind,
+        "imported": count,
+        "source_kind": fetched.source_kind,
+        "source_url": fetched.source_url,
+    }
 
 
 @router.post("/team-auth/login", response_model=TeamLoginResponse)

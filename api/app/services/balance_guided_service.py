@@ -5,7 +5,7 @@ from typing import Iterable
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.league import BalanceEntry, BalanceSheet, Fine, Player, Transfer
 from app.services.balance_calc_service import (
@@ -545,8 +545,7 @@ def normalize_guided_entries(
 
 
 def build_guided_payload(db: Session, balance: BalanceSheet) -> dict:
-    if balance.status == "draft":
-        sync_balance_draft(db, balance)
+    sync_balance_draft(db, balance)
     players, transfers, fines = _load_supporting_data(
         db, balance.team_id, balance.season_id
     )
@@ -600,6 +599,14 @@ def build_admin_balance_issues(
                 "severity": "critical",
             }
         ]
+
+    sync_balance_draft(db, balance)
+    balance = db.execute(
+        select(BalanceSheet)
+        .options(selectinload(BalanceSheet.entries))
+        .where(BalanceSheet.id == balance.id)
+    ).scalar_one()
+
     players, transfers, fines = _load_supporting_data(db, team_id, season_id)
     auto_entries, manual_entries = split_entries(balance.entries)
     guided_fields, _ = build_guided_manual_entries(manual_entries)

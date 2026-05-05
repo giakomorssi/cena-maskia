@@ -80,8 +80,9 @@
             <div class="flex items-start justify-between gap-4 mb-5 flex-wrap">
                 <div>
                     <h2 class="section-title">Upload Excel lega</h2>
-                    <p class="text-sm text-text-secondary mt-1">Ogni caricamento sostituisce il file gia presente per
-                        rose, calendario o classifica.</p>
+                    <p class="text-sm text-text-secondary mt-1">Rose e storico calendario restano via Excel. Classifica
+                        e
+                        ultima giornata calendario usano invece il refresh dalla lega pubblica.</p>
                 </div>
             </div>
             <div class="grid lg:grid-cols-3 gap-4">
@@ -90,12 +91,29 @@
                     <p class="text-xs uppercase tracking-wider text-text-tertiary">Excel</p>
                     <h3 class="section-title section-title-sm mt-2">{{ card.title }}</h3>
                     <p class="text-sm text-text-secondary mt-2 min-h-12">{{ card.description }}</p>
-                    <label class="btn btn-primary mt-4 w-full justify-center"
-                        [class.opacity-60]="isUploading(card.kind)">
-                        <input type="file" class="hidden" accept=".xlsx,.xls" (change)="uploadAsset(card.kind, $event)"
-                            [disabled]="isUploading(card.kind)" />
-                        {{ isUploading(card.kind) ? 'Caricamento…' : card.actionLabel }}
-                    </label>
+                    <div class="mt-4 flex flex-col gap-3">
+                        @if (card.uploadLabel) {
+                        <input #fileInput type="file" accept=".xlsx,.xls" class="hidden" title="Carica file Excel"
+                            (change)="onAssetFileSelected($event, card.kind)">
+                        <button class="btn btn-primary w-full justify-center"
+                            [class.opacity-60]="isUploading(card.kind)" [disabled]="isUploading(card.kind)"
+                            (click)="fileInput.click()">
+                            {{ isUploading(card.kind) ? 'Caricamento…' : card.uploadLabel }}
+                        </button>
+                        }
+
+                        @if (card.refreshLabel) {
+                        <button class="btn btn-secondary w-full justify-center"
+                            [class.opacity-60]="isUploading(card.kind)" [disabled]="isUploading(card.kind)"
+                            (click)="refreshAsset(card.kind)">
+                            {{ isUploading(card.kind) ? 'Aggiornamento…' : card.refreshLabel }}
+                        </button>
+                        }
+                    </div>
+
+                    @if (card.note) {
+                    <p class="text-xs text-text-tertiary mt-3">{{ card.note }}</p>
+                    }
                 </div>
                 }
             </div>

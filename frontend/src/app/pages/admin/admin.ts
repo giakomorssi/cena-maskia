@@ -30,27 +30,32 @@ type UploadCard = {
   kind: LeagueAssetUploadKind;
   title: string;
   description: string;
-  actionLabel: string;
+  uploadLabel?: string;
+  refreshLabel?: string;
+  note?: string;
 };
 
 const UPLOAD_CARDS: UploadCard[] = [
   {
     kind: 'rose',
     title: 'Rose',
-    description: 'Sostituisce il file Excel rose attualmente presente sul server.',
-    actionLabel: 'Carica rose',
+    description: 'Le rose si importano solo da file Excel, come nel flusso originario.',
+    uploadLabel: 'Carica Excel rose',
   },
   {
     kind: 'calendar',
     title: 'Calendario',
-    description: 'Sostituisce il file Excel del calendario e aggiorna il parser in cache.',
-    actionLabel: 'Carica calendario',
+    description:
+      'Importa prima lo storico da Excel, poi aggiorna solo l’ultima giornata dalla home pubblica della lega.',
+    uploadLabel: 'Carica storico Excel',
+    refreshLabel: 'Aggiorna ultima giornata',
   },
   {
     kind: 'classifica',
     title: 'Classifica',
-    description: 'Sostituisce il file Excel della classifica e aggiorna il parser in cache.',
-    actionLabel: 'Carica classifica',
+    description:
+      'Aggiornamento manuale disponibile sempre. Inoltre viene aggiornata automaticamente ogni martedi alle 01:00.',
+    refreshLabel: 'Aggiorna classifica',
   },
 ];
 
@@ -142,26 +147,54 @@ export class AdminComponent implements OnInit {
     return this.uploadingKind() === kind;
   }
 
-  uploadAsset(kind: LeagueAssetUploadKind, event: Event) {
-    const input = event.target as HTMLInputElement | null;
-    const file = input?.files?.[0] ?? null;
-    if (!file) return;
+  onAssetFileSelected(event: Event, kind: LeagueAssetUploadKind) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
 
+    this.uploadAsset(kind, file);
+    input.value = '';
+  }
+
+  uploadAsset(kind: LeagueAssetUploadKind, file: File) {
     this.uploadError.set(null);
     this.uploadingKind.set(kind);
 
     this.api.uploadLeagueAsset(kind, file).subscribe({
-      next: () => {
+      next: (response) => {
         this.uploadingKind.set(null);
-        if (input) input.value = '';
-        this.notify(`${this.assetLabel(kind)} aggiornato con successo`);
+        this.notify(`${this.assetLabel(kind)} importato da Excel (${response.imported})`);
       },
       error: (error) => {
         this.uploadingKind.set(null);
         this.uploadError.set(
           error?.error?.detail ?? `Errore upload ${this.assetLabel(kind).toLowerCase()}`,
         );
-        if (input) input.value = '';
+      },
+    });
+  }
+
+  refreshAsset(kind: LeagueAssetUploadKind) {
+    this.uploadError.set(null);
+    this.uploadingKind.set(kind);
+
+    this.api.refreshLeagueAsset(kind).subscribe({
+      next: (response) => {
+        this.uploadingKind.set(null);
+        const sourceLabel = response.source_kind === 'html' ? 'scraping HTML' : 'download Excel';
+        const actionLabel =
+          kind === 'calendar'
+            ? 'Ultima giornata calendario aggiornata'
+            : `${this.assetLabel(kind)} aggiornato con successo`;
+        this.notify(`${actionLabel} (${sourceLabel})`);
+      },
+      error: (error) => {
+        this.uploadingKind.set(null);
+        this.uploadError.set(
+          error?.error?.detail ?? `Errore refresh ${this.assetLabel(kind).toLowerCase()}`,
+        );
       },
     });
   }
