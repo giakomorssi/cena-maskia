@@ -120,11 +120,17 @@ export class AdminComponent implements OnInit {
   }
 
   login() {
-    const token = 'admin';
+    const token = this.password().trim();
+    if (!token) {
+      this.loginError.set('Inserisci la password admin');
+      return;
+    }
+
     this.admin.set(token);
     this.api.verifyAdmin().subscribe({
       next: () => {
         this.loginError.set(null);
+        this.password.set('');
         this.loadData();
       },
       error: () => {
@@ -136,6 +142,7 @@ export class AdminComponent implements OnInit {
 
   logout() {
     this.admin.clear();
+    this.password.set('');
   }
 
   notify(m: string) {

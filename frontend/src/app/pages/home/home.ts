@@ -39,7 +39,7 @@ export class HomeComponent implements OnInit {
   dashboard = signal<TeamDashboard | null>(null);
   adminStatuses = signal<TeamAdminStatus[]>([]);
   username = signal('');
-  password = signal('utente');
+  password = signal('');
   loginError = signal<string | null>(null);
 
   readonly isAdminView = computed(() => this.admin.isAdmin());
@@ -102,6 +102,7 @@ export class HomeComponent implements OnInit {
         this.teamSession.setSession(response.access_token, response.team);
         this.loginError.set(null);
         this.username.set('');
+        this.password.set('');
         this.router.navigateByUrl('/profilo-squadra');
       },
       error: () => this.loginError.set('Credenziali non valide'),

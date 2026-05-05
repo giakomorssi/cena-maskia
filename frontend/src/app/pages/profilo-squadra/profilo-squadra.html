@@ -23,11 +23,11 @@
                     &#9917;
                 </div>
                 <h2 class="font-display text-2xl font-bold">Seleziona la tua squadra</h2>
-                <p class="text-sm text-text-secondary mt-1">Clicca sulla card per accedere al profilo.</p>
+                <p class="text-sm text-text-secondary mt-1">Prima scegli la squadra, poi inserisci la password.</p>
             </div>
         </div>
 
-        @if (loginError()) {
+        @if (loginError() && !selectedTeam()) {
         <div class="alert alert-error mb-6">{{ loginError() }}</div>
         }
 
@@ -35,7 +35,10 @@
             @for (team of teams(); track team.id) {
             <button type="button"
                 class="group relative rounded-2xl border border-border bg-surface-inset p-4 text-left transition-all hover:border-brand hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                [disabled]="loginLoading()" (click)="loginAs(team)">
+                [disabled]="loginLoading()" (click)="selectTeam(team)">
+                @if (isSelectedTeam(team.id)) {
+                <span class="absolute right-3 top-3 badge badge-gold">Selezionata</span>
+                }
                 <div
                     class="w-10 h-10 rounded-xl bg-brand-grad flex items-center justify-center text-white font-bold text-lg mb-3 group-hover:scale-105 transition-transform">
                     {{ team.name.charAt(0).toUpperCase() }}
@@ -47,6 +50,48 @@
             </button>
             }
         </div>
+
+        @if (selectedTeam(); as team) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+            (click)="clearSelectedTeam()">
+            <div class="w-full max-w-md overflow-hidden rounded-[28px] border border-border bg-surface shadow-2xl"
+                (click)="$event.stopPropagation()">
+                <div class="border-b border-border bg-linear-to-r from-surface-inset to-gold-soft/50 px-6 py-6">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-text-tertiary">Accesso squadra</p>
+                            <h3 class="mt-2 font-display text-2xl font-bold text-text">{{ team.name }}</h3>
+                            <p class="mt-2 text-sm text-text-secondary">Inserisci la password per entrare nel profilo della squadra.</p>
+                        </div>
+                        <button type="button" class="btn btn-ghost p-2" aria-label="Chiudi accesso squadra"
+                            (click)="clearSelectedTeam()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                                <path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="px-6 py-6">
+                    @if (loginError()) {
+                    <div class="alert alert-error mb-4">{{ loginError() }}</div>
+                    }
+                    <label class="block mb-4">
+                        <span class="input-label">Password squadra</span>
+                        <input class="input mt-2" type="password" [value]="password()"
+                            (input)="setPassword($any($event.target).value)"
+                            (keydown.enter)="loginSelectedTeam()" />
+                    </label>
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" class="btn btn-ghost" (click)="clearSelectedTeam()">Annulla</button>
+                        <button type="button" class="btn btn-primary" [disabled]="loginLoading()"
+                            (click)="loginSelectedTeam()">
+                            Entra come {{ team.name }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        }
 
         @if (loginLoading()) {
         <div class="flex items-center justify-center gap-2 mt-6 text-sm text-text-secondary">

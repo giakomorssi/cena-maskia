@@ -465,7 +465,7 @@ def seed_default_teams() -> None:
                 Team(
                     name=profile["name"],
                     account_username=profile["username"],
-                    password_hash=get_password_hash("utente"),
+                    password_hash=get_password_hash(settings.team_shared_password),
                     manager_name=profile["manager_name"],
                     profile_bio=profile["profile_bio"],
                     home_city=profile["home_city"],

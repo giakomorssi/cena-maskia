@@ -24,6 +24,8 @@ export class ProfiloSquadraComponent {
   readonly session = inject(TeamSessionService);
 
   teams = signal<TeamAccount[]>([]);
+  password = signal('');
+  selectedTeamId = signal<string | null>(null);
   loginLoading = signal(false);
   loginError = signal<string | null>(null);
   dashboard = signal<TeamDashboard | null>(null);
@@ -50,6 +52,9 @@ export class ProfiloSquadraComponent {
 
   readonly canUpload = computed(() => !!this.dashboard()?.current_season);
   readonly canEditEconomy = computed(() => this.guidedBalance()?.balance.status === 'draft');
+  readonly selectedTeam = computed(
+    () => this.teams().find((team) => team.id === this.selectedTeamId()) ?? null,
+  );
   readonly selectedStadium = computed(
     () => this.stadiums().find((stadium) => stadium.id === this.selectedStadiumId()) ?? null,
   );
@@ -83,13 +88,33 @@ export class ProfiloSquadraComponent {
     }
   }
 
-  loginAs(team: TeamAccount) {
+  selectTeam(team: TeamAccount) {
+    this.selectedTeamId.set(team.id);
+    this.password.set('');
+    this.loginError.set(null);
+  }
+
+  loginSelectedTeam() {
+    const team = this.selectedTeam();
+    if (!team) {
+      this.loginError.set('Seleziona una squadra');
+      return;
+    }
+
+    const password = this.password().trim();
+    if (!password) {
+      this.loginError.set('Inserisci la password della squadra');
+      return;
+    }
+
     this.loginLoading.set(true);
     this.loginError.set(null);
-    this.api.teamLogin(team.account_username, 'utente').subscribe({
+    this.api.teamLogin(team.account_username, password).subscribe({
       next: (response) => {
         this.session.setSession(response.access_token, response.team);
         this.loginLoading.set(false);
+        this.password.set('');
+        this.selectedTeamId.set(null);
         this.loadDashboard();
       },
       error: () => {
@@ -101,6 +126,8 @@ export class ProfiloSquadraComponent {
 
   logout() {
     this.session.clear();
+    this.password.set('');
+    this.selectedTeamId.set(null);
     this.dashboard.set(null);
     this.guidedBalance.set(null);
     this.guidedFields.set([]);
@@ -116,6 +143,20 @@ export class ProfiloSquadraComponent {
       profile_bio: '',
       home_city: '',
     });
+  }
+
+  setPassword(value: string) {
+    this.password.set(value);
+  }
+
+  clearSelectedTeam() {
+    this.selectedTeamId.set(null);
+    this.password.set('');
+    this.loginError.set(null);
+  }
+
+  isSelectedTeam(teamId: string): boolean {
+    return this.selectedTeamId() === teamId;
   }
 
   loadDashboard() {

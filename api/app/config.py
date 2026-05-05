@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     project_name: str = "CENA MASKIA CHAMPIONSHIP"
     version: str = "1.0.0"
 
-    # Admin auth (single shared token)
-    admin_token: str = Field(default="admin", alias="ADMIN_TOKEN")
+    # Shared auth secrets for admin and team access
+    admin_token: str = Field(default="1234", alias="ADMIN_TOKEN")
+    team_shared_password: str = Field(default="1234", alias="TEAM_SHARED_PASSWORD")
 
     # Bilanci - sanction thresholds (perdita = utile negativo, valore assoluto)
     sanction_light_threshold: float = Field(
